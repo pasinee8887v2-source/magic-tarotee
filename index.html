@@ -1,105 +1,43 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Witchcraft Magic Tarot 🔮</title>
-
+<title>Magic Tarot 🔮 - Witch Edition</title>
 <style>
-body {
-  margin: 0;
-  overflow: hidden;
-  background: #0d0214; /* เปลี่ยนเป็นสีม่วงมืดธีมแม่มด */
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-}
-
-video, canvas {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-/* ปรับแต่งการแสดงผลของไพ่ทาโรต์ให้ลอยเด่น */
-#card {
-  position: absolute;
-  width: 240px;
-  height: auto;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%) scale(0);
-  border-radius: 15px;
-  box-shadow: 0 0 40px rgba(186, 85, 211, 0.8), 0 0 80px rgba(0, 255, 255, 0.4);
-  z-index: 10;
-  transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  border: 2px solid #ba55d3;
-}
-
-#card.show {
-  transform: translate(-50%, -50%) scale(1);
-}
-
-/* ข้อความแนะนำผู้ใช้ */
-#hint {
-  position: absolute;
-  bottom: 30px;
-  left: 50%;
-  transform: translateX(-50%);
-  color: #fff;
-  background: rgba(30, 10, 45, 0.8);
-  padding: 12px 25px;
-  border-radius: 20px;
-  font-size: 18px;
-  border: 1px solid #ba55d3;
-  text-shadow: 0 0 10px #ba55d3;
-  z-index: 11;
-  pointer-events: none;
-  box-shadow: 0 0 15px rgba(186, 85, 211, 0.5);
-}
+  body { margin: 0; overflow: hidden; background: #000; }
+  video, canvas { position: absolute; width: 100%; height: 100%; object-fit: cover; }
 </style>
-
 </head>
-
 <body>
 
-<video id="video" autoplay playsinline style="display: none;"></video>
+<video id="video" autoplay playsinline style="display:none;"></video>
 <canvas id="canvas"></canvas>
-<img id="card" alt="Tarot Card">
-<div id="hint">🔮 ยกมือขึ้นมาแล้วทำท่า "จับจีบ" (นิ้วชี้แตะนิ้วโป้ง) เพื่อร่ายมนต์สุ่มไพ่</div>
 
-<!-- เรียกใช้ MediaPipe Hands -->
+<!-- เรียกใช้ MediaPipe -->
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
 
 <script>
 const video = document.getElementById("video");
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
-const card = document.getElementById("card");
 
-// เปลี่ยนลิงก์รูปภาพไพ่ใหม่ (ใช้ Unsplash ที่รองรับการโหลดบ่อยและมั่นใจว่ารูปขึ้นแน่นอน)
-const tarotCards = [
-  "https://images.unsplash.com/photo-1601050690597-df056fb4ce78?w=500&q=80", // รูปแทนไพ่คู่รัก/โชคชะตา 
-  "https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?w=500&q=80", // รูปแนวอาร์ตเวทมนต์
-  "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=500&q=80"  // รูปแนวลึกลับธีมแม่มด
-];
+// --- 🌟 โหลดรูปภาพเตรียมไว้ล่วงหน้า (ป้องกันปัญหารูปไม่ขึ้น) 🌟 ---
+const tarotImg = new Image();
+tarotImg.crossOrigin = "anonymous"; 
+tarotImg.src = "https://www.shitsuren-tarot.com/wp/wp-content/uploads/2017/06/M_0.png";
 
-let lastTrigger = 0;
-let particles = []; // อาร์เรย์เก็บประกายเวทมนต์
+let isCardRevealed = false; // สถานะเปิดไพ่
+let lastPinch = 0;
 
-function resizeCanvas() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-}
-window.addEventListener('resize', resizeCanvas);
-resizeCanvas();
-
-// สร้างเอฟเฟคละอองเวทมนต์ (Magic Particles)
+// --- 🔮 เอฟフェคเวทมนต์ (Particles) 🔮 ---
+const particles = [];
 class Particle {
   constructor(x, y) {
     this.x = x;
     this.y = y;
-    this.size = Math.random() * 6 + 2;
+    this.size = Math.random() * 5 + 2;
     this.speedX = (Math.random() - 0.5) * 4;
     this.speedY = (Math.random() - 0.5) * 4;
-    this.color = `hsl(${Math.random() * 60 + 260}, 100%, 70%)`; // โทนสีม่วง/ชมพู/ฟ้า เวทมนต์
+    this.color = `hsl(${Math.random() * 60 + 260}, 100%, 75%)`; // โทนสีม่วง/ชมพูเวทมนต์
     this.alpha = 1;
   }
   update() {
@@ -120,131 +58,148 @@ class Particle {
   }
 }
 
-// วาดวงเวทย์แม่มดอัปเกรดซ้อนกัน 2 ชั้น
-function drawWitchCircle(x, y) {
-  let now = Date.now() * 0.002;
+// --- 🔮 วงเวทย์แม่มดหมุนวน 🔮 ---
+function drawWitchCircle(x, y, radius) {
+  let now = Date.now() / 1000;
   
   ctx.save();
   ctx.lineWidth = 3;
-  ctx.shadowBlur = 20;
+  ctx.strokeStyle = "#ba55d3"; 
+  ctx.shadowBlur = 15;
   ctx.shadowColor = "#ba55d3";
   
-  // วงกลมชั้นนอก (สีม่วง)
+  // วงนอก
   ctx.beginPath();
-  ctx.arc(x, y, 55, 0, Math.PI * 2);
-  ctx.strokeStyle = "#ba55d3";
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
   ctx.stroke();
 
-  // วงกลมชั้นใน (สีฟ้าคราม หมุนวนตามเวลา)
+  // วงในหมุน
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(now);
   ctx.beginPath();
-  ctx.arc(x, y, 40, now, now + Math.PI * 1.5);
-  ctx.strokeStyle = "#00ffff";
+  ctx.arc(0, 0, radius - 15, 0, Math.PI * 1.5);
   ctx.stroke();
+  ctx.restore();
 
   ctx.restore();
 }
 
-// ฟังก์ชันสุ่มไพ่พร้อมเอฟเฟคอนิเมชัน
-function randomCard() {
-  let i = Math.floor(Math.random() * tarotCards.length);
-  card.src = tarotCards[i];
-  card.classList.remove("show");
-  
-  // บังคับให้เบราว์เซอร์รีเซ็ตแอนิเมชันก่อนโชว์ไพ่
-  void card.offsetWidth; 
-  card.style.display = "block";
-  card.classList.add("show");
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
 }
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
 
-// โหลด MediaPipe Hands
+// ตั้งค่า MediaPipe Hands
 const hands = new Hands({
-  locateFile: (file) => {
-    return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
-  }
+  locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
 });
-
-hands.setOptions({
-  maxNumHands: 1,
-  modelComplexity: 1,
-  minDetectionConfidence: 0.6, // ปรับลดลงเล็กน้อยเพื่อให้ตรวจจับง่ายขึ้นในที่แสงน้อย
-  minTrackingConfidence: 0.6
-});
+hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
 
 hands.onResults(results => {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  // วาดภาพจากกล้องเว็บแคม (กลับด้านซ้ายขวาแบบกระจกเงา)
+  
+  // วาดภาพจากกล้องเว็บแคม (Mirror)
   ctx.save();
   ctx.scale(-1, 1);
   ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
   ctx.restore();
 
-  // อัปเดตและวาดละอองเวทมนต์ที่ค้างอยู่
+  // วาดและอัปเดตเอฟเฟคละอองเวทมนต์
   particles.forEach((p, index) => {
     p.update();
     p.draw();
     if (p.alpha <= 0) particles.splice(index, 1);
   });
 
-  // ถ้าระบบตรวจเจอข้อต่อนิ้วมือ
+  // เขียนคำแนะนำบนหน้าจอ
+  ctx.fillStyle = "#fff";
+  ctx.font = "bold 20px Arial";
+  ctx.shadowBlur = 8;
+  ctx.shadowColor = "#ba55d3";
+  ctx.fillText("🔮 ท่าจีบนิ้วชี้-นิ้วโป้ง เพื่อร่ายมนต์เปิดไพ่", 30, 50);
+
   if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
     const hand = results.multiHandLandmarks[0];
-    const indexFinger = hand[8];  // ปลายนิ้วชี้
-    const thumbFinger = hand[4];  // ปลายนิ้วโป้ง
+    
+    // พิกัดนิ้วโป้ง (4) และ นิ้วชี้ (8)
+    const thumb = hand[4];
+    const indexFinger = hand[8];
+    
+    const tx = (1 - thumb.x) * canvas.width;
+    const ty = thumb.y * canvas.height;
+    const ix = (1 - indexFinger.x) * canvas.width;
+    const iy = indexFinger.y * canvas.height;
 
-    // คำนวณพิกัดหน้าจอ
-    const x = (1 - indexFinger.x) * canvas.width;
-    const y = indexFinger.y * canvas.height;
+    // หาจุดกึ่งกลางระหว่างสองนิ้วเพื่อวาดเอฟเฟค
+    const cx = (tx + ix) / 2;
+    const cy = (ty + iy) / 2;
 
-    // วาดวงเวทย์แม่มดที่ปลายนิ้วชี้
-    drawWitchCircle(x, y);
+    // คำนวณระยะห่างเพื่อเช็คการ "จีบมือ"
+    const distance = Math.sqrt(Math.pow(tx - ix, 2) + Math.pow(ty - iy, 2));
 
-    // คำนวณระยะห่างระหว่างนิ้วโป้งและนิ้วชี้
-    const dx = thumbFinger.x - indexFinger.x;
-    const dy = thumbFinger.y - indexFinger.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-
-    // ปล่อยละอองเวทย์ออกมาจากนิ้วตลอดเวลา
+    // ปล่อยละอองเวทย์ออกจากนิ้วมือตลอดเวลาที่ยกมือ
     if (Math.random() < 0.4) {
-      particles.push(new Particle(x, y));
+      particles.push(new Particle(cx, cy));
     }
 
-    // ท่าจีบนิ้ว (ขยายระยะเพิ่มเป็น 0.1 เพื่อให้เปิดไพ่ง่ายขึ้นมาก ไม่หลุดง่าย)
-    if (distance < 0.10) {
+    // วาดวงเวทย์แม่มดตามตำแหน่งมือ
+    drawWitchCircle(cx, cy, 60);
+
+    // หากระยะห่างนิ้วเหลือน้อยกว่า 40 พิกเซล (คือการจีบนิ้วแตะกัน)
+    if (distance < 40) {
       let now = Date.now();
-      // ระเบิดละอองเวทย์เพิ่มเมื่อทำการจีบนิ้ว
-      for (let i = 0; i < 5; i++) {
-        particles.push(new Particle(x, y));
-      }
-      
-      // หน่วงเวลาการสุ่มไพ่ใหม่ทุกๆ 2 วินาทีเพื่อป้องกันภาพกระตุกถี่เกินไป
-      if (now - lastTrigger > 2000) {
-        randomCard();
-        lastTrigger = now;
+      if (now - lastPinch > 1500) { // หน่วงเวลา 1.5 วินาที
+        isCardRevealed = true; // เปิดการแสดงไพ่
+        // ระเบิดเอฟเฟคกระจาย
+        for(let i=0; i<15; i++) {
+          particles.push(new Particle(cx, cy));
+        }
+        lastPinch = now;
       }
     }
   }
+
+  // --- วาดรูปไพ่ทาโรต์กลางหน้าจอเมื่อสั่งเปิดไพ่สำเร็จ ---
+  if (isCardRevealed && tarotImg.complete) {
+    ctx.save();
+    
+    // กำหนดขนาดและตำแหน่งไพ่ตรงกลางจอ
+    const cardW = 200;
+    const cardH = 320;
+    const cardX = (canvas.width - cardW) / 2;
+    const cardY = (canvas.height - cardH) / 2;
+
+    // วาดกรอบเรืองแสงสีม่วงเวทมนต์รอบไพ่
+    ctx.shadowBlur = 30;
+    ctx.shadowColor = "#ba55d3";
+    ctx.strokeStyle = "#ba55d3";
+    ctx.lineWidth = 4;
+    ctx.strokeRect(cardX, cardY, cardW, cardH);
+
+    // วาดรูปไพ่
+    ctx.drawImage(tarotImg, cardX, cardY, cardW, cardH);
+    ctx.restore();
+  }
 });
 
-// เปิดกล้องเว็บแคม
-navigator.mediaDevices.getUserMedia({
-  video: { width: 1280, height: 720 }
-})
+// เปิดกล้อง
+navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 }, audio: false })
 .then(stream => {
   video.srcObject = stream;
-  video.addEventListener('loadeddata', async () => {
-    async function predictionLoop() {
-      await hands.send({ image: video });
+  video.addEventListener('loadeddata', () => {
+    function predictionLoop() {
+      hands.send({ image: video });
       requestAnimationFrame(predictionLoop);
     }
     predictionLoop();
   });
 })
 .catch(err => {
-  console.error("ไม่สามารถเข้าถึงกล้องได้: ", err);
-  alert("กรุณากดอนุญาตสิทธิ์การเข้าถึงกล้องถ่ายภาพก่อนนะครับ");
+  alert("กรุณาเปิดสิทธิ์ให้เว็บเข้าถึงกล้องถ่ายภาพด้วยนะครับ");
 });
 </script>
-
 </body>
 </html>
