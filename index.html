@@ -1,13 +1,14 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Magic Tarot 🔮</title>
+<title>Witchcraft Magic Tarot 🔮</title>
 
 <style>
 body {
   margin: 0;
   overflow: hidden;
-  background: black;
+  background: #0d0214; /* เปลี่ยนเป็นสีม่วงมืดธีมแม่มด */
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 video, canvas {
@@ -17,16 +18,41 @@ video, canvas {
   object-fit: cover;
 }
 
+/* ปรับแต่งการแสดงผลของไพ่ทาโรต์ให้ลอยเด่น */
 #card {
   position: absolute;
-  width: 220px;
+  width: 240px;
+  height: auto;
   left: 50%;
   top: 50%;
-  transform: translate(-50%, -50%);
-  display: none;
-  border-radius: 10px;
-  box-shadow: 0 0 30px cyan;
-  z-index: 10; /* ให้ไพ่อยู่ด้านบนสุด */
+  transform: translate(-50%, -50%) scale(0);
+  border-radius: 15px;
+  box-shadow: 0 0 40px rgba(186, 85, 211, 0.8), 0 0 80px rgba(0, 255, 255, 0.4);
+  z-index: 10;
+  transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  border: 2px solid #ba55d3;
+}
+
+#card.show {
+  transform: translate(-50%, -50%) scale(1);
+}
+
+/* ข้อความแนะนำผู้ใช้ */
+#hint {
+  position: absolute;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #fff;
+  background: rgba(30, 10, 45, 0.8);
+  padding: 12px 25px;
+  border-radius: 20px;
+  font-size: 18px;
+  border: 1px solid #ba55d3;
+  text-shadow: 0 0 10px #ba55d3;
+  z-index: 11;
+  pointer-events: none;
+  box-shadow: 0 0 15px rgba(186, 85, 211, 0.5);
 }
 </style>
 
@@ -36,9 +62,10 @@ video, canvas {
 
 <video id="video" autoplay playsinline style="display: none;"></video>
 <canvas id="canvas"></canvas>
-<img id="card">
+<img id="card" alt="Tarot Card">
+<div id="hint">🔮 ยกมือขึ้นมาแล้วทำท่า "จับจีบ" (นิ้วชี้แตะนิ้วโป้ง) เพื่อร่ายมนต์สุ่มไพ่</div>
 
-<!-- ใช้เฉพาะ hands.js ไม่ต้องใช้ camera_utils.js -->
+<!-- เรียกใช้ MediaPipe Hands -->
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
 
 <script>
@@ -47,15 +74,16 @@ const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 const card = document.getElementById("card");
 
+// เปลี่ยนลิงก์รูปภาพไพ่ใหม่ (ใช้ Unsplash ที่รองรับการโหลดบ่อยและมั่นใจว่ารูปขึ้นแน่นอน)
 const tarotCards = [
-  "https://upload.wikimedia.org/wikipedia/commons/5/53/RWS_Tarot_00_Fool.jpg",
-  "https://upload.wikimedia.org/wikipedia/commons/c/c3/RWS_Tarot_01_Magician.jpg",
-  "https://upload.wikimedia.org/wikipedia/commons/2/2b/RWS_Tarot_02_High_Priestess.jpg"
+  "https://images.unsplash.com/photo-1601050690597-df056fb4ce78?w=500&q=80", // รูปแทนไพ่คู่รัก/โชคชะตา 
+  "https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?w=500&q=80", // รูปแนวอาร์ตเวทมนต์
+  "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=500&q=80"  // รูปแนวลึกลับธีมแม่มด
 ];
 
 let lastTrigger = 0;
+let particles = []; // อาร์เรย์เก็บประกายเวทมนต์
 
-// ตั้งค่าขนาด Canvas ให้เต็มจอ
 function resizeCanvas() {
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
@@ -63,24 +91,69 @@ function resizeCanvas() {
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
 
-// วงเวทย์
-function drawMagic(x, y) {
-  ctx.beginPath();
-  ctx.arc(x, y, 50, 0, Math.PI * 2);
-  ctx.strokeStyle = "cyan";
-  ctx.lineWidth = 4;
-  ctx.shadowBlur = 25;
-  ctx.shadowColor = "cyan";
-  ctx.stroke();
-  // รีเซ็ต shadow เพื่อไม่ให้กระทบกับการวาดส่วนอื่น
-  ctx.shadowBlur = 0; 
+// สร้างเอฟเฟคละอองเวทมนต์ (Magic Particles)
+class Particle {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.size = Math.random() * 6 + 2;
+    this.speedX = (Math.random() - 0.5) * 4;
+    this.speedY = (Math.random() - 0.5) * 4;
+    this.color = `hsl(${Math.random() * 60 + 260}, 100%, 70%)`; // โทนสีม่วง/ชมพู/ฟ้า เวทมนต์
+    this.alpha = 1;
+  }
+  update() {
+    this.x += this.speedX;
+    this.y += this.speedY;
+    this.alpha -= 0.02;
+  }
+  draw() {
+    ctx.save();
+    ctx.globalAlpha = this.alpha;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+    ctx.fillStyle = this.color;
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = this.color;
+    ctx.fill();
+    ctx.restore();
+  }
 }
 
-// สุ่มไพ่
+// วาดวงเวทย์แม่มดอัปเกรดซ้อนกัน 2 ชั้น
+function drawWitchCircle(x, y) {
+  let now = Date.now() * 0.002;
+  
+  ctx.save();
+  ctx.lineWidth = 3;
+  ctx.shadowBlur = 20;
+  ctx.shadowColor = "#ba55d3";
+  
+  // วงกลมชั้นนอก (สีม่วง)
+  ctx.beginPath();
+  ctx.arc(x, y, 55, 0, Math.PI * 2);
+  ctx.strokeStyle = "#ba55d3";
+  ctx.stroke();
+
+  // วงกลมชั้นใน (สีฟ้าคราม หมุนวนตามเวลา)
+  ctx.beginPath();
+  ctx.arc(x, y, 40, now, now + Math.PI * 1.5);
+  ctx.strokeStyle = "#00ffff";
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+// ฟังก์ชันสุ่มไพ่พร้อมเอฟเฟคอนิเมชัน
 function randomCard() {
   let i = Math.floor(Math.random() * tarotCards.length);
   card.src = tarotCards[i];
+  card.classList.remove("show");
+  
+  // บังคับให้เบราว์เซอร์รีเซ็ตแอนิเมชันก่อนโชว์ไพ่
+  void card.offsetWidth; 
   card.style.display = "block";
+  card.classList.add("show");
 }
 
 // โหลด MediaPipe Hands
@@ -93,40 +166,59 @@ const hands = new Hands({
 hands.setOptions({
   maxNumHands: 1,
   modelComplexity: 1,
-  minDetectionConfidence: 0.7,
-  minTrackingConfidence: 0.7
+  minDetectionConfidence: 0.6, // ปรับลดลงเล็กน้อยเพื่อให้ตรวจจับง่ายขึ้นในที่แสงน้อย
+  minTrackingConfidence: 0.6
 });
 
 hands.onResults(results => {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // กลับภาพเหมือนกระจก
+  // วาดภาพจากกล้องเว็บแคม (กลับด้านซ้ายขวาแบบกระจกเงา)
   ctx.save();
   ctx.scale(-1, 1);
   ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
   ctx.restore();
 
-  // ตรวจจับมือ
+  // อัปเดตและวาดละอองเวทมนต์ที่ค้างอยู่
+  particles.forEach((p, index) => {
+    p.update();
+    p.draw();
+    if (p.alpha <= 0) particles.splice(index, 1);
+  });
+
+  // ถ้าระบบตรวจเจอข้อต่อนิ้วมือ
   if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
     const hand = results.multiHandLandmarks[0];
-    const index = hand[8];  // นิ้วชี้
-    const thumb = hand[4];  // นิ้วโป้ง
+    const indexFinger = hand[8];  // ปลายนิ้วชี้
+    const thumbFinger = hand[4];  // ปลายนิ้วโป้ง
 
-    // คำนวณพิกัด (กลับฝั่ง x เพื่อให้ตรงกับภาพกระจก)
-    const x = (1 - index.x) * canvas.width;
-    const y = index.y * canvas.height;
+    // คำนวณพิกัดหน้าจอ
+    const x = (1 - indexFinger.x) * canvas.width;
+    const y = indexFinger.y * canvas.height;
 
-    drawMagic(x, y);
+    // วาดวงเวทย์แม่มดที่ปลายนิ้วชี้
+    drawWitchCircle(x, y);
 
-    // ระยะห่างโป้งกับชี้
-    const dx = thumb.x - index.x;
-    const dy = thumb.y - index.y;
+    // คำนวณระยะห่างระหว่างนิ้วโป้งและนิ้วชี้
+    const dx = thumbFinger.x - indexFinger.x;
+    const dy = thumbFinger.y - indexFinger.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
 
-    // จีบนิ้ว = เปิดไพ่ (ปรับค่าระยะความกว้างให้ใช้ง่ายขึ้นเล็กน้อย)
-    if (distance < 0.08) {
+    // ปล่อยละอองเวทย์ออกมาจากนิ้วตลอดเวลา
+    if (Math.random() < 0.4) {
+      particles.push(new Particle(x, y));
+    }
+
+    // ท่าจีบนิ้ว (ขยายระยะเพิ่มเป็น 0.1 เพื่อให้เปิดไพ่ง่ายขึ้นมาก ไม่หลุดง่าย)
+    if (distance < 0.10) {
       let now = Date.now();
-      if (now - lastTrigger > 1500) {
+      // ระเบิดละอองเวทย์เพิ่มเมื่อทำการจีบนิ้ว
+      for (let i = 0; i < 5; i++) {
+        particles.push(new Particle(x, y));
+      }
+      
+      // หน่วงเวลาการสุ่มไพ่ใหม่ทุกๆ 2 วินาทีเพื่อป้องกันภาพกระตุกถี่เกินไป
+      if (now - lastTrigger > 2000) {
         randomCard();
         lastTrigger = now;
       }
@@ -134,14 +226,13 @@ hands.onResults(results => {
   }
 });
 
-// เปิดกล้องด้วย JavaScript มาตรฐาน (ไม่พึ่ง Camera Utils)
+// เปิดกล้องเว็บแคม
 navigator.mediaDevices.getUserMedia({
   video: { width: 1280, height: 720 }
 })
 .then(stream => {
   video.srcObject = stream;
   video.addEventListener('loadeddata', async () => {
-    // ลูปส่งเฟรมวิดีโอไปให้ MediaPipe ประมวลผล
     async function predictionLoop() {
       await hands.send({ image: video });
       requestAnimationFrame(predictionLoop);
@@ -151,7 +242,7 @@ navigator.mediaDevices.getUserMedia({
 })
 .catch(err => {
   console.error("ไม่สามารถเข้าถึงกล้องได้: ", err);
-  alert("กรุณาอนุญาตให้เข้าถึงกล้องถ่ายภาพ");
+  alert("กรุณากดอนุญาตสิทธิ์การเข้าถึงกล้องถ่ายภาพก่อนนะครับ");
 });
 </script>
 
