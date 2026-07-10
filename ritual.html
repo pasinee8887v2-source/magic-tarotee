@@ -32,10 +32,10 @@ class Particle {
 function draw() {
   ctx.clearRect(0,0, canvas.width, canvas.height);
   
-  // ระบบสั่นสะเทือนเมื่อมีการอัญเชิญ (Shake Effect)
+  // ระบบสั่นหน้าจอเมื่อไพ่ปรากฏ (Shake Effect)
   if(shake > 0) { 
     ctx.save(); 
-    ctx.translate(Math.random()*15-7, Math.random()*15-7); 
+    ctx.translate(Math.random()*20-10, Math.random()*20-10); 
     shake--; 
   }
   
@@ -45,34 +45,39 @@ function draw() {
 
   if(showMagicianCard) {
     cardOpacity = Math.min(1, cardOpacity + 0.05);
-    circleRotation += 0.04;
+    circleRotation += 0.06;
     ctx.save(); ctx.globalAlpha = cardOpacity; ctx.translate(touchX, touchY);
-    // วงแหวนหมุนเร็ว
-    ctx.strokeStyle = "#ffb703"; ctx.lineWidth = 2;
+    // วงแหวนเวทหมุนเร็ว
+    ctx.strokeStyle = "#ffb703"; ctx.lineWidth = 3;
     for(let i=0; i<4; i++) {
-      ctx.save(); ctx.rotate((i%2 ? 1 : -1) * circleRotation * (1 + i*0.2));
-      ctx.beginPath(); ctx.arc(0, 0, 150 + i*40, 0, Math.PI*2); ctx.stroke();
+      ctx.save(); ctx.rotate((i%2 ? 1 : -1) * circleRotation * (1 + i*0.3));
+      ctx.beginPath(); ctx.arc(0, 0, 120 + i*30, 0, Math.PI*2); ctx.stroke();
       ctx.restore();
     }
     // ไพ่
-    ctx.fillStyle = "#1a052e"; ctx.fillRect(-100, -150, 200, 300);
-    ctx.strokeStyle = "#ffb703"; ctx.strokeRect(-100, -150, 200, 300);
-    ctx.fillStyle = "#ffb703"; ctx.font = "50px serif"; ctx.textAlign = "center";
-    ctx.fillText("👁️", 0, 20);
+    ctx.fillStyle = "#1a052e"; ctx.fillRect(-80, -120, 160, 240);
+    ctx.strokeStyle = "#ffb703"; ctx.lineWidth = 4; ctx.strokeRect(-80, -120, 160, 240);
+    ctx.fillStyle = "#ffb703"; ctx.font = "40px serif"; ctx.textAlign = "center";
+    ctx.fillText("👁️", 0, 15);
     ctx.restore();
   }
   
-  if(shake > 0) ctx.restore(); // ปิดการสั่น
+  if(shake > 0) ctx.restore();
   requestAnimationFrame(draw);
 }
 draw();
 
 window.addEventListener('mousedown', (e) => {
   touchX = e.clientX; touchY = e.clientY; isTouching = true;
-  // จิ้มค้างไว้ 800ms แล้วสั่นสะเทือน + อัญเชิญไพ่
-  setTimeout(() => { showMagicianCard = true; shake = 30; }, 800);
+  setTimeout(() => { showMagicianCard = true; shake = 20; }, 800);
 });
 window.addEventListener('mouseup', () => { isTouching = false; showMagicianCard = false; cardOpacity = 0; });
+
+window.addEventListener('touchstart', (e) => {
+  touchX = e.touches[0].clientX; touchY = e.touches[0].clientY; isTouching = true;
+  setTimeout(() => { showMagicianCard = true; shake = 20; }, 800);
+});
+window.addEventListener('touchend', () => { isTouching = false; showMagicianCard = false; cardOpacity = 0; });
 </script>
 </body>
 </html>
