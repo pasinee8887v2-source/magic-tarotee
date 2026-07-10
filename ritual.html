@@ -5,9 +5,9 @@
     <title>Ritual Dark Magic 🔮</title>
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; }
-        #webcam { position: absolute; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); filter: contrast(1.5) brightness(0.5); z-index: 1; }
-        #canvas { position: absolute; width: 100%; height: 100%; z-index: 2; }
-        .vignette { position: absolute; width: 100%; height: 100%; background: radial-gradient(circle, transparent 20%, rgba(0,0,0,0.95) 100%); pointer-events: none; z-index: 3; }
+        video { position: absolute; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); filter: contrast(1.8) brightness(0.4); z-index: 1; }
+        canvas { position: absolute; width: 100%; height: 100%; z-index: 2; }
+        .vignette { position: absolute; width: 100%; height: 100%; background: radial-gradient(circle, transparent 20%, rgba(0,0,0,0.98) 100%); pointer-events: none; z-index: 3; }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/vision_bundle.js" crossorigin="anonymous"></script>
 </head>
@@ -16,58 +16,61 @@
     <video id="webcam" autoplay playsinline></video>
     <canvas id="canvas"></canvas>
 
-    <script>
-        const video = document.getElementById("webcam");
-        const canvas = document.getElementById("canvas");
-        const ctx = canvas.getContext("2d");
-        let rot = 0, float = 0;
+    <script type="module">
+        import { HandLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/bundle";
+        const video = document.getElementById("webcam"), canvas = document.getElementById("canvas"), ctx = canvas.getContext("2d");
+        let handLandmarker, particles = [];
 
         async function init() {
+            const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm");
+            handLandmarker = await HandLandmarker.createFromOptions(vision, { baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task" }, numHands: 1 });
             const stream = await navigator.mediaDevices.getUserMedia({ video: true });
             video.srcObject = stream;
-            canvas.width = window.innerWidth; canvas.height = window.innerHeight;
-            render();
+            video.onloadeddata = predict;
         }
 
-        // ฟังก์ชันวาดวงแหวน 4 ชั้น
-        function drawRings(x, y) {
-            rot += 0.02;
-            for(let i=0; i<4; i++) {
-                ctx.save();
-                ctx.translate(x, y);
-                ctx.rotate((i % 2 === 0 ? 1 : -1) * rot * (1 + i * 0.2));
-                ctx.strokeStyle = i % 2 === 0 ? "#ffb703" : "#7b2cbf";
-                ctx.lineWidth = 3;
-                ctx.beginPath(); ctx.arc(0, 0, 80 + i * 25, 0, Math.PI * 2); ctx.stroke();
-                ctx.restore();
-            }
+        function countFingers(l) {
+            let count = 0;
+            if (l[8].y < l[6].y) count++; if (l[12].y < l[10].y) count++; if (l[16].y < l[14].y) count++; if (l[20].y < l[18].y) count++;
+            if (Math.abs(l[4].x - l[17].x) > 0.1) count++; return count;
         }
 
-        // ฟังก์ชันวาดไพ่ 3 ใบ
-        function drawCards(x, y) {
-            float = Math.sin(Date.now() / 500) * 10;
-            const names = ["7 ดาบ", "THE LOVERS", "3 ดาบ"];
-            names.forEach((name, i) => {
-                let dx = x + (i - 1) * 110;
-                let dy = y + float;
-                ctx.fillStyle = "#1a052e"; ctx.fillRect(dx - 50, dy - 75, 100, 150);
-                ctx.strokeStyle = "#ffb703"; ctx.strokeRect(dx - 50, dy - 75, 100, 150);
-                ctx.fillStyle = "#ffb703"; ctx.font = "bold 14px serif"; ctx.textAlign = "center";
-                ctx.fillText(name, dx, dy + 5);
-            });
-        }
-
-        function render() {
+        async function predict() {
+            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+            const results = handLandmarker.detectForVideo(video, Date.now());
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            // จำลองพิกัดกลางจอ (สามารถเชื่อมกับพิกัดมือได้ในขั้นถัดไป)
-            const cx = canvas.width / 2;
-            const cy = canvas.height / 2;
+            
+            if (results.landmarks.length > 0) {
+                const l = results.landmarks[0], fingers = countFingers(l);
+                const cx = (1 - l[8].x) * canvas.width, cy = l[8].y * canvas.height; // ปลายชี้
 
-            drawRings(cx, cy);
-            drawCards(cx, cy);
-            requestAnimationFrame(render);
+                if (fingers >= 1) {
+                    // 1. ชู 1 นิ้วขึ้นไป: สร้างละอองออร่าเวทมนตร์ติดตามปลายนิ้ว
+                    for(let i=0; i<3; i++) particles.push({x: cx, y: cy, life: 1, vx: (Math.random()-0.5)*5, vy: (Math.random()-0.5)*5});
+                }
+                
+                // อัปเดตและวาดละอองออร่า
+                particles.forEach((p, i) => {
+                    p.x += p.vx; p.y += p.vy; p.life -= 0.05;
+                    ctx.fillStyle = `rgba(180, 100, 255, ${p.life})`;
+                    ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI*2); ctx.fill();
+                    if(p.life <= 0) particles.splice(i, 1);
+                });
+
+                // 2. ถ้าชู 5 นิ้ว: เรียกไพ่ 3 ใบ (แต่ยังคงมีออร่าละอองเวทมนตร์อยู่)
+                if (fingers === 5) {
+                    const names = ["7 ดาบ", "THE LOVERS", "3 ดาบ"];
+                    names.forEach((name, i) => {
+                        let dx = canvas.width/2 + (i - 1) * 110, dy = canvas.height/2;
+                        ctx.fillStyle = "#1a052e"; ctx.fillRect(dx - 45, dy - 70, 90, 140);
+                        ctx.strokeStyle = "#ffb703"; ctx.strokeRect(dx - 45, dy - 70, 90, 140);
+                        ctx.fillStyle = "#ffb703"; ctx.font = "bold 13px serif"; ctx.textAlign = "center";
+                        ctx.fillText(name, dx, dy + 5);
+                    });
+                }
+            }
+            requestAnimationFrame(predict);
         }
-
         init();
     </script>
 </body>
