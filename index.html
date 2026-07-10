@@ -3,114 +3,189 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Magic Tarot 🔮 - 100% DOM Edition</title>
+<title>Magic Tarot 🔮 - The Magician 100% Working</title>
 <style>
   body, html { margin: 0; padding: 0; overflow: hidden; background: #000; width: 100%; height: 100%; font-family: sans-serif; }
   
-  /* ตัวกล้องเว็บแคม */
+  /* กล้องเว็บแคมเต็มจอ + Mirror ภาพให้ตรงกับมือจริง */
   video { position: absolute; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); z-index: 1; }
   
-  /* วงเวทย์ (ใช้วิธีแสดงผลผ่าน CSS Animation หมุนจริงชัวร์) */
-  #magic-circle {
-    position: absolute; width: 160px; height: 160px;
-    border: 4px double #9d4edd; border-radius: 50%;
-    box-shadow: 0 0 25px #9d4edd, inset 0 0 25px #00ffff;
-    z-index: 5; pointer-events: none; display: none;
-    transform: translate(-50%, -50%);
-    animation: rotateCircle 4s linear infinite;
-  }
-  #magic-circle::before {
-    content: "🔮✨🌟✨🔮"; position: absolute; top: 50%; left: 50%;
-    transform: translate(-50%, -50%); color: #00ffff; font-size: 14px; letter-spacing: 5px;
-  }
-  @keyframes rotateCircle { from { transform: translate(-50%, -50%) rotate(0deg); } to { transform: translate(-50%, -50%) rotate(360deg); } }
-
-  /* ตัวไพ่ทาโรต์ The Fool (ใช้การจัดหน้าแบบลอยกึ่งกลางจอ) */
-  #tarot-card {
-    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0);
-    width: 250px; height: 410px; border-radius: 15px; border: 4px solid #ffb703;
-    background: linear-gradient(135deg, #fff3b0, #e0aaff, #3c096c);
-    box-shadow: 0 0 40px rgba(255, 183, 3, 0.8); z-index: 10;
-    transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 20px 0; box-sizing: border-box;
-  }
-  #tarot-card.show { transform: translate(-50%, -50%) scale(1); }
-  .card-num { color: #3c096c; font-size: 40px; font-weight: bold; font-family: Georgia, serif; }
-  .card-art { font-size: 80px; text-shadow: 0 0 10px rgba(255,255,255,0.5); }
-  .card-title { background: rgba(15, 0, 30, 0.85); color: #fff; padding: 8px 30px; border-radius: 5px; border: 1.5px solid #ffb703; font-weight: bold; font-family: Georgia, serif; font-size: 18px; }
-
+  /* Canvas สำหรับวาดออร่าวิ้งๆ และตัวไพ่ทาโรต์ */
+  canvas { position: absolute; width: 100%; height: 100%; object-fit: cover; z-index: 2; transform: scaleX(-1); }
+  
   /* แถบกล่องข้อความสีม่วงด้านล่างสุด */
   #status-box {
     position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
     background: rgba(35, 10, 55, 0.95); color: #fff; padding: 15px 40px;
     border-radius: 30px; font-size: 22px; font-weight: bold; border: 2px solid #ba55d3;
-    box-shadow: 0 0 25px rgba(186, 85, 211, 0.6); z-index: 20; text-align: center; white-space: nowrap;
+    box-shadow: 0 0 25px rgba(186, 85, 211, 0.6); z-index: 10; text-align: center; white-space: nowrap;
     transition: all 0.3s ease; pointer-events: none;
   }
 </style>
 </head>
 <body>
 
-<video id="video" autoplay playsinline></video>
+<video id="video" autoplay playsinline muted></video>
+<canvas id="canvas"></canvas>
+<div id="status-box">🔮 กำลังเปิดเนตรแม่หมอ... กรุณารอสักครู่</div>
 
-<!-- ส่วนของวงเวทย์และไพ่ที่แยกออกมาเป็นชิ้นๆ แสดงผลชัวร์ 100% -->
-<div id="magic-circle"></div>
-
-<div id="tarot-card">
-  <div class="card-num">0</div>
-  <div class="card-art">🃏</div>
-  <div class="card-title">THE FOOL</div>
-</div>
-
-<div id="status-box">🔮 [คลิกซ้าย 1 ครั้งบนจอ] เพื่ออัญเชิญไพ่ หรือ [ขยับเมาส์] เพื่อดูวงเวทย์</div>
+<!-- โหลด MediaPipe Hands เวอร์ชั่นเสถียรที่สุดผ่าน CDN สาธารณะ -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
 
 <script>
 const video = document.getElementById("video");
-const magicCircle = document.getElementById("magic-circle");
-const tarotCard = document.getElementById("tarot-card");
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
 const statusBox = document.getElementById("status-box");
 
-// 1. ระบบวงเวทย์วิ่งไล่ตามนิ้ว/เมาส์แบบ Real-time
-window.addEventListener('mousemove', (e) => {
-  magicCircle.style.display = "block";
-  magicCircle.style.left = e.clientX + "px";
-  magicCircle.style.top = e.clientY + "px";
-});
+let particles = [];
+let showMagicianCard = false;
 
-window.addEventListener('touchmove', (e) => {
-  if (e.touches.length > 0) {
-    magicCircle.style.display = "block";
-    magicCircle.style.left = e.touches[0].clientX + "px";
-    magicCircle.style.top = e.touches[0].clientY + "px";
+// คลาสละอองเวทมนต์เรืองแสง (ออร่าวิ้งๆ)
+class MagicParticle {
+  constructor(x, y) {
+    this.x = x; this.y = y;
+    this.size = Math.random() * 6 + 3;
+    this.speedX = (Math.random() - 0.5) * 5;
+    this.speedY = (Math.random() - 0.5) * 5;
+    const colors = ["#9d4edd", "#c8b6ff", "#00ffff", "#ffb703", "#ff007f"];
+    this.color = colors[Math.floor(Math.random() * colors.length)];
+    this.alpha = 1;
+    this.decay = Math.random() * 0.02 + 0.02;
+  }
+  update() { this.x += this.speedX; this.y += this.speedY; this.alpha -= this.decay; }
+  draw() {
+    ctx.save(); ctx.globalAlpha = this.alpha; ctx.beginPath();
+    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+    ctx.fillStyle = this.color; ctx.shadowBlur = 20; ctx.shadowColor = this.color;
+    ctx.fill(); ctx.restore();
+  }
+}
+
+function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+window.addEventListener('resize', resizeCanvas); resizeCanvas();
+
+// ฟังก์ชันวาดไพ่ THE MAGICIAN สีทองอร่ามตรงกลางจอ (วาดสดด้วยโค้ด ขึ้นชัวร์ 100%)
+function drawMagicianCard() {
+  const cardW = 260, cardH = 430;
+  const cardX = (canvas.width - cardW) / 2, cardY = (canvas.height - cardH) / 2;
+  
+  ctx.save();
+  // เนื่องจากเราทำการ Mirror Canvas ไว้เพื่อให้ออร่าตรงกับมือ เราต้องแก้การวาดข้อความไม่ให้กลับด้าน
+  ctx.translate(canvas.width, 0);
+  ctx.scale(-1, 1);
+  
+  const trueX = canvas.width - cardX - cardW;
+
+  ctx.shadowBlur = 50; ctx.shadowColor = "#ffb703"; ctx.strokeStyle = "#ffb703"; ctx.lineWidth = 5;
+  
+  // ดีไซน์การ์ดแม่หมอสีทอง-ม่วงลึกลับ
+  let grad = ctx.createLinearGradient(trueX, cardY, trueX, cardY + cardH);
+  grad.addColorStop(0, "#ffe49e"); grad.addColorStop(0.5, "#d8b4fe"); grad.addColorStop(1, "#2d005d");
+  ctx.fillStyle = grad;
+  ctx.beginPath(); ctx.roundRect(trueX, cardY, cardW, cardH, 20); ctx.fill(); ctx.stroke();
+
+  // เลขโรมัน I
+  ctx.fillStyle = "#2d005d"; ctx.font = "bold 40px Georgia"; ctx.textAlign = "center";
+  ctx.fillText("I", trueX + cardW/2, cardY + 70);
+
+  // สัญลักษณ์อินฟินิตี้และองค์ประกอบเวทมนต์
+  ctx.font = "35px Georgia"; ctx.fillText("∞", trueX + cardW/2, cardY + 130);
+  ctx.font = "80px Georgia"; ctx.fillText("🧙‍♂️✨", trueX + cardW/2, cardY + 240);
+
+  // ป้ายชื่อไพ่ด้านล่างสุด
+  ctx.fillStyle = "rgba(20, 0, 40, 0.9)"; ctx.fillRect(trueX + 20, cardY + cardH - 70, cardW - 40, 50);
+  ctx.strokeStyle = "#ffb703"; ctx.lineWidth = 2; ctx.strokeRect(trueX + 20, cardY + cardH - 70, cardW - 40, 50);
+  ctx.fillStyle = "#ffb703"; ctx.font = "bold 20px Georgia";
+  ctx.fillText("THE MAGICIAN", trueX + cardW/2, cardY + cardH - 38);
+  
+  ctx.restore();
+}
+
+// ฟังก์ชันเช็คว่านิ้วชี้ชูขึ้นหรือไม่
+function isFingerUp(tip, pip, mcp) { return tip.y < pip.y && pip.y < mcp.y; }
+
+// ตั้งค่าระบบตรวจจับมือ MediaPipe
+const hands = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
+hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+
+hands.onResults((results) => {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+  // อัปเดตและวาดละอองออร่าวิ้งๆ
+  particles.forEach((p, i) => { p.update(); p.draw(); if (p.alpha <= 0) particles.splice(i, 1); });
+
+  let handDetected = false;
+
+  if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+    handDetected = true;
+    const landmarks = results.multiHandLandmarks[0];
+    
+    // พิกัดปลายนิ้วชี้
+    const indexTipX = landmarks[8].x * canvas.width;
+    const indexTipY = landmarks[8].y * canvas.height;
+
+    // ตรวจสอบการชูนิ้ว
+    const indexUp = isFingerUp(landmarks[8], landmarks[7], landmarks[5]);
+    const middleUp = isFingerUp(landmarks[12], landmarks[11], landmarks[9]);
+    const ringUp = isFingerUp(landmarks[16], landmarks[15], landmarks[13]);
+    const pinkyUp = isFingerUp(landmarks[20], landmarks[19], landmarks[17]);
+
+    // นับจำนวนนิ้วที่ชู
+    let upFingersCount = 0;
+    if (indexUp) upFingersCount++;
+    if (middleUp) upFingersCount++;
+    if (ringUp) upFingersCount++;
+    if (pinkyUp) upFingersCount++;
+
+    // สภาพที่ 1: ชูนิ้วชี้ 1 นิ้วถ้วน -> ปล่อยออร่าวิ้งๆ วิ่งตามมือ
+    if (indexUp && upFingersCount === 1) {
+      showMagicianCard = false;
+      for(let i=0; i<4; i++) { particles.push(new MagicParticle(indexTipX, indexTipY)); }
+      
+      statusBox.innerHTML = "🔮 มนตราแห่งดรรชนี! ออร่าเวทมนต์กำลังวิ่งตามนิ้วชี้ของคุณ";
+      statusBox.style.color = "#00ffff"; statusBox.style.borderColor = "#00ffff";
+      statusBox.style.boxShadow = "0 0 25px rgba(0, 255, 255, 0.6)";
+    } 
+    // สภาพที่ 2: ชูมือครบ 5 นิ้ว (หรือ 4 นิ้วขึ้นไป) -> ปรากฏคำว่า THE MAGICIAN สีทอง
+    else if (upFingersCount >= 4) { 
+      showMagicianCard = true;
+      statusBox.innerHTML = "✨ THE MAGICIAN ✨";
+      statusBox.style.color = "#ffb703"; statusBox.style.borderColor = "#ffb703";
+      statusBox.style.boxShadow = "0 0 30px rgba(255, 183, 3, 0.8)";
+    } else {
+      showMagicianCard = false;
+    }
+  }
+
+  // หากไม่มีมืออยู่บนจอ ให้กลับเป็นข้อความเริ่มต้นสีม่วง
+  if (!handDetected) {
+    showMagicianCard = false;
+    statusBox.innerHTML = "🔮 ชูนิ้วชี้ 1 นิ้วเพื่อร่ายออร่าวิ้งๆ | แบมือ 5 นิ้วเพื่อเปิดไพ่ THE MAGICIAN";
+    statusBox.style.color = "#fff"; statusBox.style.borderColor = "#ba55d3";
+    statusBox.style.boxShadow = "0 0 25px rgba(186, 85, 211, 0.6)";
+  }
+
+  // วาดไพ่ขึ้นจอ
+  if (showMagicianCard) {
+    drawMagicianCard();
   }
 });
 
-// 2. ระบบคลิกเพื่อเปิดไพ่และระเบิดพลัง
-window.addEventListener('click', (e) => {
-  // แสดงไพ่ทาโรต์ตรงกลางจอทันที
-  tarotCard.classList.add("show");
-
-  // ล็อควงเวทย์ให้อยู่ตรงจุดที่คลิกล่าสุด
-  magicCircle.style.display = "block";
-  magicCircle.style.left = e.clientX + "px";
-  magicCircle.style.top = e.clientY + "px";
-  magicCircle.style.borderColor = "#ffb703"; // เปลี่ยนวงเวทย์เป็นสีทอง
-  magicCircle.style.boxShadow = "0 0 30px #ffb703";
-
-  // เปลี่ยนแถบข้อความด้านล่างเป็นเวอร์ชันอัญเชิญสำเร็จสีม่วง-ทองตามบรีฟ
-  statusBox.innerHTML = "🔮 อัญเชิญสำเร็จ! ไพ่ 'THE FOOL' ของแท้ จากไรเดอร์-เวท";
-  statusBox.style.color = "#ffb703"; 
-  statusBox.style.borderColor = "#ffb703"; 
-  statusBox.style.boxShadow = "0 0 30px rgba(255, 183, 3, 0.8)";
-});
-
-// 3. เรียกใช้งานกล้องเว็บแคมปกติ
+// เริ่มเปิดกล้องและเชื่อมลูปการทำงาน
 navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 }, audio: false })
 .then(stream => {
   video.srcObject = stream;
+  const camera = new Camera(video, {
+    onFrame: async () => { await hands.send({ image: video }); },
+    width: 1280, height: 720
+  });
+  camera.start();
 })
 .catch(err => {
-  console.error("Camera error:", err);
+  statusBox.innerHTML = "❌ กล้องขัดข้อง หรือไม่ได้รับสิทธิ์เข้าถึงกล้อง";
+  console.error(err);
 });
 </script>
 </body>
