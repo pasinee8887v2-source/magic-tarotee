@@ -3,62 +3,44 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Magic Tarot 🔮 - The Magician 100% Working</title>
+<title>Ritual Dark Magic 🔮</title>
 <style>
-  body, html { margin: 0; padding: 0; overflow: hidden; background: #000; width: 100%; height: 100%; font-family: sans-serif; }
-  
-  /* กล้องเว็บแคมเต็มจอ + Mirror ภาพให้ตรงกับมือจริง */
-  video { position: absolute; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); z-index: 1; }
-  
-  /* Canvas สำหรับวาดออร่าวิ้งๆ และตัวไพ่ทาโรต์ */
-  canvas { position: absolute; width: 100%; height: 100%; object-fit: cover; z-index: 2; transform: scaleX(-1); }
-  
-  /* แถบกล่องข้อความสีม่วงด้านล่างสุด */
-  #status-box {
-    position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
-    background: rgba(35, 10, 55, 0.95); color: #fff; padding: 15px 40px;
-    border-radius: 30px; font-size: 22px; font-weight: bold; border: 2px solid #ba55d3;
-    box-shadow: 0 0 25px rgba(186, 85, 211, 0.6); z-index: 10; text-align: center; white-space: nowrap;
-    transition: all 0.3s ease; pointer-events: none;
-  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body, html { overflow: hidden; background: #000; width: 100%; height: 100%; font-family: 'Georgia', serif; user-select: none; }
+  video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); z-index: 1; }
+  canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 2; pointer-events: none; }
 </style>
 </head>
 <body>
 
 <video id="video" autoplay playsinline muted></video>
 <canvas id="canvas"></canvas>
-<div id="status-box">🔮 กำลังเปิดเนตรแม่หมอ... กรุณารอสักครู่</div>
-
-<!-- โหลด MediaPipe Hands เวอร์ชั่นเสถียรที่สุดผ่าน CDN สาธารณะ -->
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
 
 <script>
 const video = document.getElementById("video");
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
-const statusBox = document.getElementById("status-box");
 
 let particles = [];
 let showMagicianCard = false;
+let circleRotation = 0;
 
-// คลาสละอองเวทมนต์เรืองแสง (ออร่าวิ้งๆ)
-class MagicParticle {
+class MysticAura {
   constructor(x, y) {
     this.x = x; this.y = y;
-    this.size = Math.random() * 6 + 3;
-    this.speedX = (Math.random() - 0.5) * 5;
-    this.speedY = (Math.random() - 0.5) * 5;
-    const colors = ["#9d4edd", "#c8b6ff", "#00ffff", "#ffb703", "#ff007f"];
-    this.color = colors[Math.floor(Math.random() * colors.length)];
+    this.size = Math.random() * 9 + 4;
+    this.speedX = (Math.random() - 0.5) * 4;
+    this.speedY = (Math.random() - 0.5) * 4 - 1.5;
+    const ritualColors = ["#3c096c", "#5a189a", "#ffb703", "#ff9e00", "#140024", "#241133"];
+    this.color = ritualColors[Math.floor(Math.random() * ritualColors.length)];
     this.alpha = 1;
-    this.decay = Math.random() * 0.02 + 0.02;
+    this.decay = Math.random() * 0.012 + 0.008;
   }
   update() { this.x += this.speedX; this.y += this.speedY; this.alpha -= this.decay; }
   draw() {
     ctx.save(); ctx.globalAlpha = this.alpha; ctx.beginPath();
     ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-    ctx.fillStyle = this.color; ctx.shadowBlur = 20; ctx.shadowColor = this.color;
+    ctx.fillStyle = this.color; ctx.shadowBlur = 30; ctx.shadowColor = this.color;
     ctx.fill(); ctx.restore();
   }
 }
@@ -66,127 +48,63 @@ class MagicParticle {
 function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
 window.addEventListener('resize', resizeCanvas); resizeCanvas();
 
-// ฟังก์ชันวาดไพ่ THE MAGICIAN สีทองอร่ามตรงกลางจอ (วาดสดด้วยโค้ด ขึ้นชัวร์ 100%)
-function drawMagicianCard() {
+function drawGothicMagician() {
   const cardW = 260, cardH = 430;
-  const cardX = (canvas.width - cardW) / 2, cardY = (canvas.height - cardH) / 2;
-  
+  const cx = canvas.width / 2, cy = canvas.height / 2;
   ctx.save();
-  // เนื่องจากเราทำการ Mirror Canvas ไว้เพื่อให้ออร่าตรงกับมือ เราต้องแก้การวาดข้อความไม่ให้กลับด้าน
-  ctx.translate(canvas.width, 0);
-  ctx.scale(-1, 1);
-  
-  const trueX = canvas.width - cardX - cardW;
+  circleRotation += 0.006;
+  ctx.translate(cx, cy); ctx.rotate(circleRotation);
+  ctx.strokeStyle = "rgba(255, 158, 0, 0.45)"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(0, 0, 260, 0, Math.PI * 2); ctx.stroke();
+  ctx.setLineDash([8, 18]);
+  ctx.beginPath(); ctx.arc(0, 0, 285, 0, Math.PI * 2); ctx.stroke();
+  ctx.restore();
 
-  ctx.shadowBlur = 50; ctx.shadowColor = "#ffb703"; ctx.strokeStyle = "#ffb703"; ctx.lineWidth = 5;
-  
-  // ดีไซน์การ์ดแม่หมอสีทอง-ม่วงลึกลับ
-  let grad = ctx.createLinearGradient(trueX, cardY, trueX, cardY + cardH);
-  grad.addColorStop(0, "#ffe49e"); grad.addColorStop(0.5, "#d8b4fe"); grad.addColorStop(1, "#2d005d");
+  ctx.save();
+  const cardX = cx - cardW / 2, cardY = cy - cardH / 2;
+  ctx.shadowBlur = 70; ctx.shadowColor = "rgba(255, 110, 0, 0.75)"; ctx.strokeStyle = "#c99722"; ctx.lineWidth = 4.5;
+  let grad = ctx.createLinearGradient(cardX, cardY, cardX, cardY + cardH);
+  grad.addColorStop(0, "#1f0c2b"); grad.addColorStop(0.5, "#3b200a"); grad.addColorStop(1, "#0a0112");
   ctx.fillStyle = grad;
-  ctx.beginPath(); ctx.roundRect(trueX, cardY, cardW, cardH, 20); ctx.fill(); ctx.stroke();
-
-  // เลขโรมัน I
-  ctx.fillStyle = "#2d005d"; ctx.font = "bold 40px Georgia"; ctx.textAlign = "center";
-  ctx.fillText("I", trueX + cardW/2, cardY + 70);
-
-  // สัญลักษณ์อินฟินิตี้และองค์ประกอบเวทมนต์
-  ctx.font = "35px Georgia"; ctx.fillText("∞", trueX + cardW/2, cardY + 130);
-  ctx.font = "80px Georgia"; ctx.fillText("🧙‍♂️✨", trueX + cardW/2, cardY + 240);
-
-  // ป้ายชื่อไพ่ด้านล่างสุด
-  ctx.fillStyle = "rgba(20, 0, 40, 0.9)"; ctx.fillRect(trueX + 20, cardY + cardH - 70, cardW - 40, 50);
-  ctx.strokeStyle = "#ffb703"; ctx.lineWidth = 2; ctx.strokeRect(trueX + 20, cardY + cardH - 70, cardW - 40, 50);
-  ctx.fillStyle = "#ffb703"; ctx.font = "bold 20px Georgia";
-  ctx.fillText("THE MAGICIAN", trueX + cardW/2, cardY + cardH - 38);
-  
+  ctx.beginPath(); ctx.roundRect(cardX, cardY, cardW, cardH, 15); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = "rgba(255, 183, 3, 0.25)"; ctx.lineWidth = 1.5;
+  ctx.strokeRect(cardX + 12, cardY + 12, cardW - 24, cardH - 24);
+  ctx.fillStyle = "#ffb703"; ctx.font = "34px Georgia"; ctx.textAlign = "center";
+  ctx.shadowBlur = 12; ctx.shadowColor = "#ffb703";
+  ctx.fillText("∞", cx, cardY + 80);
+  ctx.font = "80px Georgia"; ctx.fillText("👁️‍🗨️", cx, cardY + 205);
+  ctx.font = "26px Georgia"; ctx.fillStyle = "#d8bbff"; ctx.fillText("🪞 🪄 🗡️ 🏆", cx, cardY + 285);
+  ctx.fillStyle = "rgba(8, 2, 12, 0.95)"; ctx.fillRect(cardX + 25, cardY + cardH - 75, cardW - 50, 45);
+  ctx.strokeStyle = "#c99722"; ctx.strokeRect(cardX + 25, cardY + cardH - 75, cardW - 50, 45);
+  ctx.fillStyle = "#ffb703"; ctx.font = "bold 18px 'Times New Roman', Georgia"; ctx.letterSpacing = "2px";
+  ctx.fillText("I. THE MAGICIAN", cx, cardY + cardH - 46);
   ctx.restore();
 }
 
-// ฟังก์ชันเช็คว่านิ้วชี้ชูขึ้นหรือไม่
-function isFingerUp(tip, pip, mcp) { return tip.y < pip.y && pip.y < mcp.y; }
-
-// ตั้งค่าระบบตรวจจับมือ MediaPipe
-const hands = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
-hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
-
-hands.onResults((results) => {
+function renderRitual() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  
-  // อัปเดตและวาดละอองออร่าวิ้งๆ
-  particles.forEach((p, i) => { p.update(); p.draw(); if (p.alpha <= 0) particles.splice(i, 1); });
-
-  let handDetected = false;
-
-  if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-    handDetected = true;
-    const landmarks = results.multiHandLandmarks[0];
-    
-    // พิกัดปลายนิ้วชี้
-    const indexTipX = landmarks[8].x * canvas.width;
-    const indexTipY = landmarks[8].y * canvas.height;
-
-    // ตรวจสอบการชูนิ้ว
-    const indexUp = isFingerUp(landmarks[8], landmarks[7], landmarks[5]);
-    const middleUp = isFingerUp(landmarks[12], landmarks[11], landmarks[9]);
-    const ringUp = isFingerUp(landmarks[16], landmarks[15], landmarks[13]);
-    const pinkyUp = isFingerUp(landmarks[20], landmarks[19], landmarks[17]);
-
-    // นับจำนวนนิ้วที่ชู
-    let upFingersCount = 0;
-    if (indexUp) upFingersCount++;
-    if (middleUp) upFingersCount++;
-    if (ringUp) upFingersCount++;
-    if (pinkyUp) upFingersCount++;
-
-    // สภาพที่ 1: ชูนิ้วชี้ 1 นิ้วถ้วน -> ปล่อยออร่าวิ้งๆ วิ่งตามมือ
-    if (indexUp && upFingersCount === 1) {
-      showMagicianCard = false;
-      for(let i=0; i<4; i++) { particles.push(new MagicParticle(indexTipX, indexTipY)); }
-      
-      statusBox.innerHTML = "🔮 มนตราแห่งดรรชนี! ออร่าเวทมนต์กำลังวิ่งตามนิ้วชี้ของคุณ";
-      statusBox.style.color = "#00ffff"; statusBox.style.borderColor = "#00ffff";
-      statusBox.style.boxShadow = "0 0 25px rgba(0, 255, 255, 0.6)";
-    } 
-    // สภาพที่ 2: ชูมือครบ 5 นิ้ว (หรือ 4 นิ้วขึ้นไป) -> ปรากฏคำว่า THE MAGICIAN สีทอง
-    else if (upFingersCount >= 4) { 
-      showMagicianCard = true;
-      statusBox.innerHTML = "✨ THE MAGICIAN ✨";
-      statusBox.style.color = "#ffb703"; statusBox.style.borderColor = "#ffb703";
-      statusBox.style.boxShadow = "0 0 30px rgba(255, 183, 3, 0.8)";
-    } else {
-      showMagicianCard = false;
-    }
+  for (let i = particles.length - 1; i >= 0; i--) {
+    particles[i].update(); particles[i].draw();
+    if (particles[i].alpha <= 0) particles.splice(i, 1);
   }
+  if (showMagicianCard) drawGothicMagician();
+  requestAnimationFrame(renderRitual);
+}
+renderRitual();
 
-  // หากไม่มีมืออยู่บนจอ ให้กลับเป็นข้อความเริ่มต้นสีม่วง
-  if (!handDetected) {
-    showMagicianCard = false;
-    statusBox.innerHTML = "🔮 ชูนิ้วชี้ 1 นิ้วเพื่อร่ายออร่าวิ้งๆ | แบมือ 5 นิ้วเพื่อเปิดไพ่ THE MAGICIAN";
-    statusBox.style.color = "#fff"; statusBox.style.borderColor = "#ba55d3";
-    statusBox.style.boxShadow = "0 0 25px rgba(186, 85, 211, 0.6)";
-  }
-
-  // วาดไพ่ขึ้นจอ
-  if (showMagicianCard) {
-    drawMagicianCard();
+window.addEventListener('mousemove', (e) => {
+  for(let i=0; i<3; i++) { particles.push(new MysticAura(e.clientX, e.clientY)); }
+});
+window.addEventListener('touchmove', (e) => {
+  if (e.touches.length > 0) {
+    for(let i=0; i<3; i++) { particles.push(new MysticAura(e.touches[0].clientX, e.touches[0].clientY)); }
   }
 });
+window.addEventListener('click', () => { showMagicianCard = !showMagicianCard; });
 
-// เริ่มเปิดกล้องและเชื่อมลูปการทำงาน
 navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 }, audio: false })
-.then(stream => {
-  video.srcObject = stream;
-  const camera = new Camera(video, {
-    onFrame: async () => { await hands.send({ image: video }); },
-    width: 1280, height: 720
-  });
-  camera.start();
-})
-.catch(err => {
-  statusBox.innerHTML = "❌ กล้องขัดข้อง หรือไม่ได้รับสิทธิ์เข้าถึงกล้อง";
-  console.error(err);
-});
+.then(stream => { video.srcObject = stream; })
+.catch(err => { console.error("Camera error:", err); });
 </script>
 </body>
 </html>
