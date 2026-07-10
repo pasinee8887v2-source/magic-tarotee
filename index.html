@@ -1,16 +1,58 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Witchcraft Rider-Waite Tarot 🔮</title>
+<title>Witchcraft Magic Tarot 🔮</title>
 <style>
   body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
   video, canvas { position: absolute; width: 100%; height: 100%; object-fit: cover; }
+  
+  /* สไตล์แถบข้อความด้านล่างตอนไพ่ขึ้น (ตามภาพ image_4.png) */
+  #success-message {
+    position: absolute;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(45, 0, 90, 0.9); /* แถบสีม่วงทึบ */
+    color: #ffb703; /* ตัวอักษรสีทองเวทมนต์ */
+    padding: 15px 40px;
+    border-radius: 25px;
+    font-size: 22px;
+    font-weight: bold;
+    border: 2px solid #ba55d3; /* ขอบเรืองแสง */
+    box-shadow: 0 0 20px rgba(186, 85, 211, 0.7);
+    z-index: 100;
+    text-align: center;
+    white-space: nowrap;
+    opacity: 0; /* ซ่อนไว้ก่อนตอนเริ่ม */
+    transition: opacity 0.5s ease-in-out; /* ค่อยๆ ปรากฏ */
+  }
+  
+  /* ข้อความแนะนำตอนเริ่มเกม (สีขาวปกติ) */
+  #hint-text {
+    position: absolute;
+    bottom: 80px; /* ขยับขึ้นไปไม่ให้ทับกับแถบม่วง */
+    left: 50%;
+    transform: translateX(-50%);
+    color: #fff;
+    font-size: 20px;
+    font-weight: bold;
+    text-shadow: 0 0 10px #ba55d3;
+    z-index: 99;
+    text-align: center;
+    opacity: 1; /* โชว์ตอนเริ่ม */
+    transition: opacity 0.3s ease-in-out;
+  }
 </style>
 </head>
 <body>
 
 <video id="video" autoplay playsinline style="display:none;"></video>
 <canvas id="canvas"></canvas>
+
+<!-- แถบข้อความตามภาพ image_4.png -->
+<div id="success-message">🔮 อัญเชิญสำเร็จ! ไพ่ 'THE FOOL' ของแท้ จากไรเดอร์-เวท</div>
+<!-- ข้อความแนะนำตอนเริ่ม -->
+<div id="hint-text">🔮 ท่าจีบนิ้วชี้-นิ้วโป้ง เพื่อร่ายมนต์เปิดไพ่</div>
 
 <!-- เรียกใช้ MediaPipe Hands -->
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
@@ -19,28 +61,19 @@
 const video = document.getElementById("video");
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
+const successMsg = document.getElementById("success-message");
+const hintText = document.getElementById("hint-text");
 
-// --- 🌟 อัปเดตลิงก์รูปไพ่ Rider-Waite ของแท้ 🌟 ---
-const tarotCards = [
-  { name: "THE FOOL", url: "https://upload.wikimedia.org/wikipedia/commons/0/0a/RWS_Tarot_00_Fool.jpg" },
-  { name: "THE MAGICIAN", url: "https://upload.wikimedia.org/wikipedia/commons/d/de/RWS_Tarot_01_Magician.jpg" },
-  { name: "DEATH", url: "https://upload.wikimedia.org/wikipedia/commons/d/d7/RWS_Tarot_13_Death.jpg" }
-];
+// --- 🌟 อัปเดตลิงก์รูปไพ่ 'THE FOOL' ของแท้จาก Rider-Waite 🌟 ---
+const tarotImg = new Image();
+tarotImg.crossOrigin = "anonymous"; 
+tarotImg.src = "https://upload.wikimedia.org/wikipedia/commons/0/0a/RWS_Tarot_00_Fool.jpg"; // ลิงก์ตรงรูป Fool ของแท้
 
-// โหลดรูปภาพทั้งหมดมารอไว้ล่วงหน้าเพื่อความลื่นไหล
-const loadedImages = [];
-tarotCards.forEach(card => {
-  const img = new Image();
-  img.crossOrigin = "anonymous";
-  img.src = card.url;
-  loadedImages.push({ name: card.name, img: img });
-});
-
-let currentCard = null;
+let isCardRevealed = false; // สถานะเปิดไพ่
 let lastPinch = 0;
-const particles = [];
 
-// --- 🔮 คลาสเอฟเฟคละอองเวทมนต์ (Magic Particles) แบบจัดเต็ม 🔮 ---
+// --- 🔮 เอฟเฟคละอองเวทมนต์ (Particles) แบบจัดเต็ม 🔮 ---
+const particles = [];
 class Particle {
   constructor(x, y, isExplosion = false) {
     this.x = x;
@@ -75,50 +108,46 @@ class Particle {
   }
 }
 
-// --- 🔮 วาดวงเวทย์อักขระโบราณแบบซับซ้อน 🔮 ---
+// --- 🔮 วาดวงเวทย์อักขระโบราณซับซ้อนตามตำแหน่งมือ 🔮 ---
 function drawMysticCircle(x, y, radius) {
   let now = Date.now() / 1000;
   
   ctx.save();
   ctx.shadowBlur = 25;
-  ctx.shadowColor = "#9d4edd";
+  ctx.shadowColor = "#ba55d3"; 
   
-  // 1. วงนอกสุด (เส้นหนา)
+  // 1. วงนอกสุด (เส้นหนา สีม่วง)
   ctx.lineWidth = 4;
-  ctx.strokeStyle = "#9d4edd";
+  ctx.strokeStyle = "#ba55d3";
   ctx.beginPath();
   ctx.arc(x, y, radius, 0, Math.PI * 2);
   ctx.stroke();
 
-  // 2. วงกลางหมุนทวนเข็มนาฬิกา + มีจุดอักขระ
-  ctx.lineWidth = 1.5;
+  // 2. วงกลางหมุนเร็วขึ้น (สีฟ้าคราม)
+  ctx.lineWidth = 2;
   ctx.strokeStyle = "#00ffff";
   ctx.save();
   ctx.translate(x, y);
-  ctx.rotate(-now * 0.8);
+  ctx.rotate(now * 1.5);
   ctx.beginPath();
-  ctx.arc(0, 0, radius - 15, 0, Math.PI * 2);
-  ctx.stroke();
-  
-  // วาดแฉกดาวภายในวงเวทย์เพิ่มความขลัง
-  ctx.beginPath();
-  for (let i = 0; i < 5; i++) {
-    let angle = (i * Math.PI * 2) / 5;
-    ctx.lineTo(Math.cos(angle) * (radius - 15), Math.sin(angle) * (radius - 15));
-  }
-  ctx.closePath();
+  ctx.arc(0, 0, radius - 15, 0, Math.PI * 1.5);
   ctx.stroke();
   ctx.restore();
 
-  // 3. วงในสุด หมุนตามเข็มนาฬิกา
-  ctx.strokeStyle = "#ffb703";
-  ctx.lineWidth = 2;
+  // 3. วงในสุดพร้อมจุดอักขระ
   ctx.save();
   ctx.translate(x, y);
-  ctx.rotate(now * 1.2);
-  ctx.beginPath();
-  ctx.arc(0, 0, radius - 35, 0, Math.PI * 1.5);
-  ctx.stroke();
+  ctx.rotate(-now);
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = "#fff";
+  for (let i = 0; i < 8; i++) {
+    const angle = i * (Math.PI * 2 / 8);
+    const px = Math.cos(angle) * (radius - 5);
+    const py = Math.sin(angle) * (radius - 5);
+    ctx.beginPath();
+    ctx.arc(px, py, 3, 0, Math.PI * 2);
+    ctx.stroke();
+  }
   ctx.restore();
 
   ctx.restore();
@@ -131,7 +160,7 @@ function resizeCanvas() {
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
 
-// ตั้งค่าระบบตรวจจับมือ
+// ตั้งค่า MediaPipe Hands
 const hands = new Hands({
   locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
 });
@@ -140,13 +169,13 @@ hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0
 hands.onResults(results => {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   
-  // วาดกล้อง (Mirror)
+  // วาดภาพจากกล้องเว็บแคม (Mirror)
   ctx.save();
   ctx.scale(-1, 1);
   ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
   ctx.restore();
 
-  // อัปเดตเอฟเฟคละอองเวทมนต์ที่ค้างอยู่ทั้งหมด
+  // วาดและอัปเดตเอฟเฟคละอองเวทมนต์ที่ค้างอยู่
   particles.forEach((p, index) => {
     p.update();
     p.draw();
@@ -155,6 +184,8 @@ hands.onResults(results => {
 
   if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
     const hand = results.multiHandLandmarks[0];
+    
+    // พิกัดนิ้วโป้ง (4) และ นิ้วชี้ (8)
     const thumb = hand[4];
     const indexFinger = hand[8];
     
@@ -163,11 +194,14 @@ hands.onResults(results => {
     const ix = (1 - indexFinger.x) * canvas.width;
     const iy = indexFinger.y * canvas.height;
 
+    // หาจุดกึ่งกลางระหว่างสองนิ้วเพื่อวาดเอฟเฟค
     const cx = (tx + ix) / 2;
     const cy = (ty + iy) / 2;
+
+    // คำนวณระยะห่างเพื่อเช็คการ "จีบมือ"
     const distance = Math.sqrt(Math.pow(tx - ix, 2) + Math.pow(ty - iy, 2));
 
-    // ปล่อยละอองเวทย์ปกติรอบๆ นิ้ว
+    // ปล่อยละอองเวทย์ออกมาจากนิ้วปกติรอบๆ ยกมือ
     if (Math.random() < 0.5) {
       particles.push(new Particle(cx, cy, false));
     }
@@ -175,25 +209,28 @@ hands.onResults(results => {
     // วาดวงเวทย์แม่มดอลังการตามตำแหน่งมือ
     drawMysticCircle(cx, cy, 75);
 
-    // ท่าจีบนิ้วเพื่อทำพิธีสุ่มเปิดไพ่ (ระยะห่างน้อยกว่า 45 พิกเซล)
-    if (distance < 45) {
+    // หากระยะห่างนิ้วเหลือน้อยกว่า 40 พิกเซล (คือการจีบนิ้วแตะกัน)
+    if (distance < 40) {
       let now = Date.now();
-      if (now - lastPinch > 2000) { // หน่วงเวลาสุ่มใหม่ทุก 2 วินาที
-        // สุ่มไพ่จาก 3 ใบที่กำหนดไว้
-        const randomIndex = Math.floor(Math.random() * loadedImages.length);
-        currentCard = loadedImages[randomIndex];
-
-        // เกิดเอฟเฟคระเบิดเวทมนต์กระจายรอบจอขลังๆ 40 ชิ้น
-        for (let i = 0; i < 40; i++) {
+      if (now - lastPinch > 1500) { // หน่วงเวลา 1.5 วินาที
+        isCardRevealed = true; // เปิดการแสดงไพ่
+        
+        // ระเบิดอนุภาคเวทมนต์กระจายรอบๆ 30 ชิ้น (เป็นเอฟเฟคระเบิดตามภาพ 4)
+        for (let i = 0; i < 30; i++) {
           particles.push(new Particle(cx, cy, true));
         }
+
+        // จัดการข้อความตามภาพ image_4.png
+        hintText.style.opacity = "0"; // ซ่อนคำแนะนำตอนเริ่ม
+        successMsg.style.opacity = "1"; // แสดงแถบสีม่วงอัญเชิญสำเร็จ
+        
         lastPinch = now;
       }
     }
   }
 
-  // --- 🔮 ส่วนของการแสดงผลไพ่ทาโรต์กลางหน้าจอ 🔮 ---
-  if (currentCard && currentCard.img.complete) {
+  // --- วาดรูปไพ่ 'THE FOOL' ของแท้ กลางหน้าจอเมื่อสั่งเปิดไพ่สำเร็จ ---
+  if (isCardRevealed && tarotImg.complete) {
     ctx.save();
     
     // กำหนดขนาดสัดส่วนไพ่สากลและจัดให้อยู่ตรงกลางจอพอดี
@@ -205,7 +242,7 @@ hands.onResults(results => {
     // สร้างกรอบเงาเรืองแสงสีทองและม่วงล้อมรอบตัวไพ่ให้ดูศักดิ์สิทธิ์
     ctx.shadowBlur = 40;
     ctx.shadowColor = "#ffb703";
-    ctx.strokeStyle = "#9d4edd";
+    ctx.strokeStyle = "#ba55d3";
     ctx.lineWidth = 5;
     
     // วาดพื้นหลังสีดำใสให้ไพ่ดูตัดกับฉากหลัง
@@ -214,31 +251,12 @@ hands.onResults(results => {
     ctx.strokeRect(cardX, cardY, cardW, cardH);
 
     // วาดรูปไพ่ Rider-Waite แท้ลงไป
-    ctx.drawImage(currentCard.img, cardX, cardY, cardW, cardH);
-
-    // เขียนชื่อไพ่กำกับไว้ใต้ภาพด้วยฟอนต์หรูๆ
-    ctx.fillStyle = "#fff";
-    ctx.font = "bold 22px Georgia";
-    ctx.shadowColor = "#000";
-    ctx.shadowBlur = 4;
-    ctx.textAlign = "center";
-    ctx.fillText(currentCard.name, canvas.width / 2, cardY + cardH + 35);
-
-    ctx.restore();
-  } else {
-    // ข้อความแนะนำผู้เล่นตอนเริ่มเกม
-    ctx.save();
-    ctx.fillStyle = "#fff";
-    ctx.font = "bold 22px 'Segoe UI'";
-    ctx.shadowBlur = 10;
-    ctx.shadowColor = "#9d4edd";
-    ctx.textAlign = "center";
-    ctx.fillText("🔮 ยกมือทำท่าจับจีบ (นิ้วชี้แตะนิ้วโป้ง) เพื่ออัญเชิญไพ่ทาโรต์ 🔮", canvas.width / 2, canvas.height - 60);
+    ctx.drawImage(tarotImg, cardX, cardY, cardW, cardH);
     ctx.restore();
   }
 });
 
-// เปิดการใช้งานกล้องเว็บแคม
+// เปิดกล้อง
 navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 }, audio: false })
 .then(stream => {
   video.srcObject = stream;
@@ -249,6 +267,9 @@ navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 }, audio
     }
     predictionLoop();
   });
+})
+.catch(err => {
+  alert("กรุณาเปิดสิทธิ์ให้เว็บเข้าถึงกล้องถ่ายภาพด้วยนะครับ");
 });
 </script>
 </body>
