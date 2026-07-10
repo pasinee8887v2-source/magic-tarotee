@@ -8,13 +8,17 @@
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body, html { overflow: hidden; background: #000; width: 100%; height: 100%; font-family: 'Georgia', serif; user-select: none; }
   video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); z-index: 1; }
-  canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 2; pointer-events: none; }
+  canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 2; }
 </style>
 </head>
 <body>
 
 <video id="video" autoplay playsinline muted></video>
 <canvas id="canvas"></canvas>
+
+<!-- โหลด Library ตรวจจับมือผ่าน CDN สาธารณะที่เสถียรที่สุด -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
 
 <script>
 const video = document.getElementById("video");
@@ -25,86 +29,179 @@ let particles = [];
 let showMagicianCard = false;
 let circleRotation = 0;
 
+// คลาสไอเวทมนตร์โบราณ (สไตล์ควันฟุ้งและประกายไฟพิธีกรรม)
 class MysticAura {
   constructor(x, y) {
     this.x = x; this.y = y;
     this.size = Math.random() * 9 + 4;
     this.speedX = (Math.random() - 0.5) * 4;
-    this.speedY = (Math.random() - 0.5) * 4 - 1.5;
+    this.speedY = (Math.random() - 0.5) * 4 - 1.5; // ลอยขึ้นเหมือนควันกำยาน
+    
     const ritualColors = ["#3c096c", "#5a189a", "#ffb703", "#ff9e00", "#140024", "#241133"];
     this.color = ritualColors[Math.floor(Math.random() * ritualColors.length)];
     this.alpha = 1;
-    this.decay = Math.random() * 0.012 + 0.008;
+    this.decay = Math.random() * 0.015 + 0.01;
   }
-  update() { this.x += this.speedX; this.y += this.speedY; this.alpha -= this.decay; }
+  update() { 
+    this.x += this.speedX; 
+    this.y += this.speedY; 
+    this.alpha -= this.decay; 
+  }
   draw() {
-    ctx.save(); ctx.globalAlpha = this.alpha; ctx.beginPath();
+    ctx.save();
+    ctx.globalAlpha = this.alpha;
+    ctx.beginPath();
     ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-    ctx.fillStyle = this.color; ctx.shadowBlur = 30; ctx.shadowColor = this.color;
-    ctx.fill(); ctx.restore();
+    ctx.fillStyle = this.color;
+    ctx.shadowBlur = 30;
+    ctx.shadowColor = this.color;
+    ctx.fill();
+    ctx.restore();
   }
 }
 
 function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
 window.addEventListener('resize', resizeCanvas); resizeCanvas();
 
+// ฟังก์ชันวาดวงแหวนเวทมนตร์และไพ่ THE MAGICIAN สไตล์มืดโบราณ
 function drawGothicMagician() {
   const cardW = 260, cardH = 430;
-  const cx = canvas.width / 2, cy = canvas.height / 2;
+  const cx = canvas.width / 2;
+  const cy = canvas.height / 2;
+  
   ctx.save();
+  
+  // 1. วาดวงแหวนอักขระโบราณหมุนรอบไพ่
   circleRotation += 0.006;
-  ctx.translate(cx, cy); ctx.rotate(circleRotation);
-  ctx.strokeStyle = "rgba(255, 158, 0, 0.45)"; ctx.lineWidth = 2;
+  ctx.translate(cx, cy);
+  ctx.rotate(circleRotation);
+  ctx.strokeStyle = "rgba(255, 158, 0, 0.45)";
+  ctx.lineWidth = 2;
   ctx.beginPath(); ctx.arc(0, 0, 260, 0, Math.PI * 2); ctx.stroke();
   ctx.setLineDash([8, 18]);
   ctx.beginPath(); ctx.arc(0, 0, 285, 0, Math.PI * 2); ctx.stroke();
   ctx.restore();
 
+  // 2. วาดตัวไพ่ทาโรต์คัมภีร์เก่า
   ctx.save();
-  const cardX = cx - cardW / 2, cardY = cy - cardH / 2;
-  ctx.shadowBlur = 70; ctx.shadowColor = "rgba(255, 110, 0, 0.75)"; ctx.strokeStyle = "#c99722"; ctx.lineWidth = 4.5;
+  const cardX = cx - cardW / 2;
+  const cardY = cy - cardH / 2;
+  
+  ctx.shadowBlur = 70; 
+  ctx.shadowColor = "rgba(255, 110, 0, 0.75)"; 
+  ctx.strokeStyle = "#c99722"; 
+  ctx.lineWidth = 4.5;
+  
   let grad = ctx.createLinearGradient(cardX, cardY, cardX, cardY + cardH);
-  grad.addColorStop(0, "#1f0c2b"); grad.addColorStop(0.5, "#3b200a"); grad.addColorStop(1, "#0a0112");
+  grad.addColorStop(0, "#1f0c2b"); 
+  grad.addColorStop(0.5, "#3b200a"); 
+  grad.addColorStop(1, "#0a0112");
   ctx.fillStyle = grad;
-  ctx.beginPath(); ctx.roundRect(cardX, cardY, cardW, cardH, 15); ctx.fill(); ctx.stroke();
-  ctx.strokeStyle = "rgba(255, 183, 3, 0.25)"; ctx.lineWidth = 1.5;
+  
+  ctx.beginPath(); 
+  ctx.roundRect(cardX, cardY, cardW, cardH, 15); 
+  ctx.fill(); 
+  ctx.stroke();
+
+  ctx.strokeStyle = "rgba(255, 183, 3, 0.25)";
+  ctx.lineWidth = 1.5;
   ctx.strokeRect(cardX + 12, cardY + 12, cardW - 24, cardH - 24);
-  ctx.fillStyle = "#ffb703"; ctx.font = "34px Georgia"; ctx.textAlign = "center";
+
+  ctx.fillStyle = "#ffb703"; 
+  ctx.font = "34px Georgia"; 
+  ctx.textAlign = "center";
   ctx.shadowBlur = 12; ctx.shadowColor = "#ffb703";
   ctx.fillText("∞", cx, cardY + 80);
-  ctx.font = "80px Georgia"; ctx.fillText("👁️‍🗨️", cx, cardY + 205);
-  ctx.font = "26px Georgia"; ctx.fillStyle = "#d8bbff"; ctx.fillText("🪞 🪄 🗡️ 🏆", cx, cardY + 285);
-  ctx.fillStyle = "rgba(8, 2, 12, 0.95)"; ctx.fillRect(cardX + 25, cardY + cardH - 75, cardW - 50, 45);
-  ctx.strokeStyle = "#c99722"; ctx.strokeRect(cardX + 25, cardY + cardH - 75, cardW - 50, 45);
-  ctx.fillStyle = "#ffb703"; ctx.font = "bold 18px 'Times New Roman', Georgia"; ctx.letterSpacing = "2px";
+
+  ctx.font = "80px Georgia";
+  ctx.fillText("👁️‍🗨️", cx, cardY + 205);
+  ctx.font = "26px Georgia";
+  ctx.fillStyle = "#d8bbff";
+  ctx.fillText("🪞 🪄 🗡️ 🏆", cx, cardY + 285);
+
+  ctx.fillStyle = "rgba(8, 2, 12, 0.95)";
+  ctx.fillRect(cardX + 25, cardY + cardH - 75, cardW - 50, 45);
+  ctx.strokeStyle = "#c99722";
+  ctx.strokeRect(cardX + 25, cardY + cardH - 75, cardW - 50, 45);
+  
+  ctx.fillStyle = "#ffb703";
+  ctx.font = "bold 18px 'Times New Roman', Georgia";
+  ctx.letterSpacing = "2px";
   ctx.fillText("I. THE MAGICIAN", cx, cardY + cardH - 46);
+  
   ctx.restore();
 }
 
-function renderRitual() {
+// ฟังก์ชันเช็คว่านิ้วชี้ชูขึ้นฟ้าอยู่หรือไม่
+function isFingerUp(tip, pip, mcp) { return tip.y < pip.y && pip.y < mcp.y; }
+
+// ตั้งค่าระบบตรวจจับมือ MediaPipe
+const hands = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
+hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+
+// ลูปประมวลผลการร่ายมนตร์จากกล้อง
+hands.onResults((results) => {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+  // อัปเดตและวาดควันไอเวทมนตร์
   for (let i = particles.length - 1; i >= 0; i--) {
-    particles[i].update(); particles[i].draw();
+    particles[i].update();
+    particles[i].draw();
     if (particles[i].alpha <= 0) particles.splice(i, 1);
   }
-  if (showMagicianCard) drawGothicMagician();
-  requestAnimationFrame(renderRitual);
-}
-renderRitual();
 
-window.addEventListener('mousemove', (e) => {
-  for(let i=0; i<3; i++) { particles.push(new MysticAura(e.clientX, e.clientY)); }
-});
-window.addEventListener('touchmove', (e) => {
-  if (e.touches.length > 0) {
-    for(let i=0; i<3; i++) { particles.push(new MysticAura(e.touches[0].clientX, e.touches[0].clientY)); }
+  if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+    const landmarks = results.multiHandLandmarks[0];
+    
+    // คำนวณพิกัดปลายนิ้วชี้ (Index Finger Tip) โดยทำการ Mirror แนวนอนให้ตรงกับภาพกล้อง
+    const indexTipX = (1 - landmarks[8].x) * canvas.width;
+    const indexTipY = landmarks[8].y * canvas.height;
+
+    // ตรวจสอบการชูของแต่ละนิ้ว
+    const indexUp = isFingerUp(landmarks[8], landmarks[7], landmarks[5]);
+    const middleUp = isFingerUp(landmarks[12], landmarks[11], landmarks[9]);
+    const ringUp = isFingerUp(landmarks[16], landmarks[15], landmarks[13]);
+    const pinkyUp = isFingerUp(landmarks[20], landmarks[19], landmarks[17]);
+
+    // นับจำนวนนิ้วที่กางออก
+    let upFingersCount = 0;
+    if (indexUp) upFingersCount++;
+    if (middleUp) upFingersCount++;
+    if (ringUp) upFingersCount++;
+    if (pinkyUp) upFingersCount++;
+
+    // เงื่อนไขที่ 1: ชูนิ้วชี้ 1 นิ้วถ้วน -> ปล่อยควันเวทมนตร์วิ่งตามปลายนิ้ว
+    if (indexUp && upFingersCount === 1) {
+      showMagicianCard = false;
+      for(let i=0; i<4; i++) { particles.push(new MysticAura(indexTipX, indexTipY)); }
+    } 
+    // เงื่อนไขที่ 2: ชูครบ 5 นิ้ว (หรือ 4 นิ้วขึ้นไป) -> ปรากฏไพ่ THE MAGICIAN
+    else if (upFingersCount >= 4) { 
+      showMagicianCard = true;
+    } else {
+      showMagicianCard = false;
+    }
+  } else {
+    showMagicianCard = false;
+  }
+
+  // วาดไพ่เมื่อเงื่อนไขถูกต้อง
+  if (showMagicianCard) {
+    drawGothicMagician();
   }
 });
-window.addEventListener('click', () => { showMagicianCard = !showMagicianCard; });
 
+// ดึงกล้องเว็บแคมขึ้นและส่งเฟรมเข้าสู่ระบบตรวจจับนิ้วมือ
 navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 }, audio: false })
-.then(stream => { video.srcObject = stream; })
-.catch(err => { console.error("Camera error:", err); });
+.then(stream => { 
+  video.srcObject = stream;
+  const camera = new Camera(video, {
+    onFrame: async () => { await hands.send({ image: video }); },
+    width: 1280, height: 720
+  });
+  camera.start();
+})
+.catch(err => { console.error("Camera system offline:", err); });
 </script>
 </body>
 </html>
