@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Magic Tarot 🔮</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: black; }
+    video, canvas {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+    }
+    #card {
+      position: absolute;
+      width: 220px;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      display: none;
+      border-radius: 10px;
+      box-shadow: 0 0 30px cyan;
+    }
+  </style>
+</head>
+
+<body>
+  <video id="video" autoplay playsinline></video>
+  <canvas id="canvas"></canvas>
+  <img id="card">
+
+  <!-- MediaPipe -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+
+  <script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const card = document.getElementById('card');
+
+    const tarotCards = [
+      "https://upload.wikimedia.org/wikipedia/commons/5/53/RWS_Tarot_00_Fool.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/c/c3/RWS_Tarot_01_Magician.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/2/2b/RWS_Tarot_02_High_Priestess.jpg"
+    ];
+
+    function drawMagic(x, y) {
+      ctx.beginPath();
+      ctx.arc(x, y, 40, 0, Math.PI * 2);
+      ctx.strokeStyle = "cyan";
+      ctx.lineWidth = 3;
+
+      ctx.shadowBlur = 20;
+      ctx.shadowColor = "cyan";
+
+      ctx.stroke();
+    }
+
+    function randomCard() {
+      const i = Math.floor(Math.random() * tarotCards.length);
+      card.src = tarotCards[i];
+      card.style.display = "block";
+    }
+
+    const hands = new Hands({
+      locateFile: file => https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}
+    });
+
+    hands.setOptions({
+      maxNumHands: 1,
+      minDetectionConfidence: 0.7,
+      minTrackingConfidence: 0.7
+    });
+
+    hands.onResults(results => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        const hand = results.multiHandLandmarks[0];
+
+        const index = hand[8]; // นิ้วชี้
+        const thumb = hand[4]; // นิ้วโป้ง
+
+        const x = index.x * canvas.width;
+        const y = index.y * canvas.height;
+
+        drawMagic(x, y);
+
+        // 👉 gesture: บีบนิ้ว = เปิดไพ่
+        const dx = thumb.x - index.x;
+        const dy = thumb.y - index.y;
+        const distance = Math.sqrt(dx*dx + dy*dy);
+
+        if (distance < 0.05) {
+          randomCard();
+        }
+      }
+    });
+
+    const camera = new Camera(video, {
+      onFrame: async () => {
+        await hands.send({ image: video });
+      },
+      width: 640,
+      height: 480
+    });
+
+    camera.start();
+  </script>
+</body>
+</html>
