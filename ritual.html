@@ -2,12 +2,13 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Ritual Dark Magic 🔮</title>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
   body, html { overflow: hidden; background: #000; width: 100%; height: 100%; font-family: 'Georgia', serif; user-select: none; }
   
+  /* ปรับแต่งกล้องให้สีดาร์ก ลึกลับ และขลังขึ้น */
   video { 
     position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
     object-fit: cover; transform: scaleX(-1); z-index: 1;
@@ -16,6 +17,7 @@
   
   canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 3; }
 
+  /* เอฟเฟกต์ Vignette ถมขอบดำรอบจอเพื่อความดาร์ก */
   .vignette {
     position: absolute; top: 0; left: 0; width: 100%; height: 100%;
     background: radial-gradient(circle, transparent 30%, rgba(0,0,0,0.85) 100%);
@@ -29,6 +31,9 @@
 <div class="vignette"></div>
 <canvas id="canvas"></canvas>
 
+<!-- โหลด Library ตรวจจับมือเวอร์ชันเสถียร -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
 <script>
 const video = document.getElementById("video");
 const canvas = document.getElementById("canvas");
@@ -37,24 +42,19 @@ const ctx = canvas.getContext("2d");
 let particles = [];
 let showMagicianCard = false;
 let circleRotation = 0;
-let cardFloatTime = 0;
-let holdTimer = null;
+let cardFloatTime = 0; // ตัวนับเวลาสำหรับเอฟเฟกต์ไพ่ลอย
 
-// พิกัดล่าสุดที่นิ้วสัมผัสจอ
-let touchX = 0;
-let touchY = 0;
-let isTouching = false;
-
+// คลาสควันไอเวทมนตร์อัปเกรด ความฟุ้งกระจาย
 class MysticAura {
   constructor(x, y) {
     this.x = x; this.y = y;
-    this.size = Math.random() * 12 + 6;
-    this.speedX = (Math.random() - 0.5) * 6;
-    this.speedY = (Math.random() - 0.5) * 6 - 2;
+    this.size = Math.random() * 10 + 5;
+    this.speedX = (Math.random() - 0.5) * 5;
+    this.speedY = (Math.random() - 0.5) * 5 - 2; // ลอยพุ่งขึ้นข้างบน
     const ritualColors = ["#3c096c", "#5a189a", "#ffb703", "#ff9e00", "#140024", "#7b2cbf"];
     this.color = ritualColors[Math.floor(Math.random() * ritualColors.length)];
     this.alpha = 1;
-    this.decay = Math.random() * 0.015 + 0.01;
+    this.decay = Math.random() * 0.012 + 0.008;
   }
   update() { this.x += this.speedX; this.y += this.speedY; this.alpha -= this.decay; }
   draw() {
@@ -68,116 +68,154 @@ class MysticAura {
 function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
 window.addEventListener('resize', resizeCanvas); resizeCanvas();
 
-function drawGothicMagician(x, y) {
+// ฟังก์ชันวาดวงแหวนเวทมนตร์และไพ่ลอยได้สุดอลังการ
+function drawGothicMagician() {
   const cardW = 260, cardH = 430;
+  const cx = canvas.width / 2;
+  
+  // 1. ระบบไพ่ลอยได้นุ่มนวล (Floating Effect ใช้ Math.sin)
   cardFloatTime += 0.04;
-  const cy = y + Math.sin(cardFloatTime) * 12; 
+  const cy = (canvas.height / 2) + Math.sin(cardFloatTime) * 12; 
+  
   circleRotation += 0.005;
   
+  // 2. ระบบวงแหวนอักขระโบราณ 4 ชั้น หมุนไขว้สวนทางกัน
   ctx.save();
-  ctx.translate(x, cy);
+  ctx.translate(cx, cy);
   ctx.lineWidth = 2;
   
-  // วงแหวนเวทมนตร์ 4 ชั้นหมุนสวนทาง
-  ctx.save(); ctx.rotate(circleRotation); ctx.strokeStyle = "rgba(255, 158, 0, 0.25)"; ctx.beginPath(); ctx.arc(0, 0, 290, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
-  ctx.save(); ctx.rotate(-circleRotation * 1.5); ctx.strokeStyle = "rgba(255, 183, 3, 0.4)"; ctx.setLineDash([8, 15]); ctx.beginPath(); ctx.arc(0, 0, 265, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
-  ctx.save(); ctx.rotate(circleRotation * 0.8); ctx.strokeStyle = "rgba(123, 44, 191, 0.35)"; ctx.setLineDash([4, 8]); ctx.beginPath(); ctx.arc(0, 0, 240, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
-  ctx.save(); ctx.rotate(-circleRotation * 2); ctx.strokeStyle = "rgba(255, 158, 0, 0.5)"; ctx.setLineDash([20, 30]); ctx.beginPath(); ctx.arc(0, 0, 215, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+  // ชั้นที่ 1: วงนอกสุด (หมุนตามเข็ม)
+  ctx.save(); ctx.rotate(circleRotation);
+  ctx.strokeStyle = "rgba(255, 158, 0, 0.25)";
+  ctx.beginPath(); ctx.arc(0, 0, 290, 0, Math.PI * 2); ctx.stroke();
   ctx.restore();
 
-  // ตัวไพ่
+  // ชั้นที่ 2: วงเส้นประขลังๆ (หมุนทวนเข็ม)
+  ctx.save(); ctx.rotate(-circleRotation * 1.5);
+  ctx.strokeStyle = "rgba(255, 183, 3, 0.4)";
+  ctx.setLineDash([8, 15]);
+  ctx.beginPath(); ctx.arc(0, 0, 265, 0, Math.PI * 2); ctx.stroke();
+  ctx.restore();
+
+  // ชั้นที่ 3: วงในทึบ (หมุนตามเข็ม)
+  ctx.save(); ctx.rotate(circleRotation * 0.8);
+  ctx.strokeStyle = "rgba(123, 44, 191, 0.35)";
+  ctx.setLineDash([4, 8]);
+  ctx.beginPath(); ctx.arc(0, 0, 240, 0, Math.PI * 2); ctx.stroke();
+  ctx.restore();
+  
+  // ชั้นที่ 4: วงอักขระชิดตัวไพ่ (หมุนทวนเข็ม)
+  ctx.save(); ctx.rotate(-circleRotation * 2);
+  ctx.strokeStyle = "rgba(255, 158, 0, 0.5)";
+  ctx.setLineDash([20, 30]);
+  ctx.beginPath(); ctx.arc(0, 0, 215, 0, Math.PI * 2); ctx.stroke();
+  ctx.restore();
+
+  ctx.restore();
+
+  // 3. วาดตัวไพ่จอมขมังเวทย์
   ctx.save();
-  const cardX = x - cardW / 2, cardY = cy - cardH / 2;
-  ctx.shadowBlur = 80; ctx.shadowColor = "rgba(255, 110, 0, 0.8)"; ctx.strokeStyle = "#c99722"; ctx.lineWidth = 5;
+  const cardX = cx - cardW / 2, cardY = cy - cardH / 2;
+  
+  // ออร่าเรืองแสงหลังไพ่
+  ctx.shadowBlur = 80; ctx.shadowColor = "rgba(255, 110, 0, 0.8)"; 
+  ctx.strokeStyle = "#c99722"; ctx.lineWidth = 5;
+  
+  // พื้นหลังไพ่ไล่เฉดดาร์กๆ
   let grad = ctx.createLinearGradient(cardX, cardY, cardX, cardY + cardH);
   grad.addColorStop(0, "#1a052e"); grad.addColorStop(0.5, "#2d1502"); grad.addColorStop(1, "#08000f");
   ctx.fillStyle = grad;
+  
   ctx.beginPath(); ctx.roundRect(cardX, cardY, cardW, cardH, 18); ctx.fill(); ctx.stroke();
   
+  // กรอบเส้นประสีทองชั้นใน
   ctx.strokeStyle = "rgba(255, 183, 3, 0.3)"; ctx.lineWidth = 1.5;
   ctx.strokeRect(cardX + 12, cardY + 12, cardW - 24, cardH - 24);
   
-  ctx.fillStyle = "#ffb703"; ctx.font = "36px Georgia"; ctx.textAlign = "center"; ctx.shadowBlur = 15; ctx.shadowColor = "#ffb703";
-  ctx.fillText("∞", x, cardY + 80);
-  ctx.font = "85px Georgia"; ctx.fillText("👁️‍🗨️", x, cardY + 205);
-  ctx.font = "26px Georgia"; ctx.fillStyle = "#d8bbff"; ctx.fillText("🪞 🪄 🗡️ 🏆", x, cardY + 285);
+  // อักขระและสัญลักษณ์ไพ่
+  ctx.fillStyle = "#ffb703"; ctx.font = "36px Georgia"; ctx.textAlign = "center";
+  ctx.shadowBlur = 15; ctx.shadowColor = "#ffb703";
+  ctx.fillText("∞", cx, cardY + 80);
+  ctx.font = "85px Georgia"; ctx.fillText("👁️‍🗨️", cx, cardY + 205);
+  ctx.font = "26px Georgia"; ctx.fillStyle = "#d8bbff"; ctx.fillText("🪞 🪄 🗡️ 🏆", cx, cardY + 285);
   
+  // ป้ายชื่อไพ่ด้านล่าง
   ctx.fillStyle = "rgba(10, 2, 18, 0.95)"; ctx.fillRect(cardX + 25, cardY + cardH - 75, cardW - 50, 45);
   ctx.strokeStyle = "#c99722"; ctx.strokeRect(cardX + 25, cardY + cardH - 75, cardW - 50, 45);
   ctx.fillStyle = "#ffb703"; ctx.font = "bold 18px 'Times New Roman', Georgia"; ctx.letterSpacing = "2px";
-  ctx.fillText("I. THE MAGICIAN", x, cardY + cardH - 46);
+  ctx.fillText("I. THE MAGICIAN", cx, cardY + cardH - 46);
   ctx.restore();
 }
 
-// ลูปวาดหน้าจอหลัก
-function drawFrame() {
+function isFingerUp(tip, pip, mcp) { return tip.y < pip.y && pip.y < mcp.y; }
+
+const hands = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
+hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
+
+hands.onResults((results) => {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   
-  // ปล่อยควันถ้านิ้วสัมผัสจอ
-  if (isTouching) {
-    for (let i = 0; i < 4; i++) {
-      particles.push(new MysticAura(touchX, touchY));
-    }
-  }
-
-  // วาดและอัปเดตควัน
   for (let i = particles.length - 1; i >= 0; i--) {
     particles[i].update(); particles[i].draw();
     if (particles[i].alpha <= 0) particles.splice(i, 1);
   }
 
-  // วาดไพ่ถ้าเงื่อนไขปลดล็อคสำเร็จ
-  if (showMagicianCard) {
-    drawGothicMagician(touchX, touchY);
+  if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+    const landmarks = results.multiHandLandmarks[0];
+    
+    const indexTipX = (1 - landmarks[8].x) * canvas.width;
+    const indexTipY = landmarks[8].y * canvas.height;
+
+    const indexUp = isFingerUp(landmarks[8], landmarks[7], landmarks[5]);
+    const middleUp = isFingerUp(landmarks[12], landmarks[11], landmarks[9]);
+    const ringUp = isFingerUp(landmarks[16], landmarks[15], landmarks[13]);
+    const pinkyUp = isFingerUp(landmarks[20], landmarks[19], landmarks[17]);
+
+    let upFingersCount = 0;
+    if (indexUp) upFingersCount++;
+    if (middleUp) upFingersCount++;
+    if (ringUp) upFingersCount++;
+    if (pinkyUp) upFingersCount++;
+
+    // 1 นิ้วชี้ = ร่ายควันออร่าโบราณ
+    if (indexUp && upFingersCount === 1) {
+      showMagicianCard = false;
+      for(let i=0; i<5; i++) { particles.push(new MysticAura(indexTipX, indexTipY)); }
+    } 
+    // แบมือ 5 นิ้ว = อัญเชิญไพ่ลอยได้และวงแหวนเวท
+    else if (upFingersCount >= 4) { 
+      showMagicianCard = true;
+    } else {
+      showMagicianCard = false;
+    }
+  } else {
+    showMagicianCard = false;
   }
 
-  requestAnimationFrame(drawFrame);
-}
-drawFrame();
-
-// ดักจับเหตุการณ์การสัมผัส (ได้ทั้งเมาส์และนิ้วบนจอ)
-function handleStart(x, y) {
-  touchX = x; touchY = y;
-  isTouching = true;
-  showMagicianCard = false;
-  
-  // ถ้าจิ้มนิ่งๆ ค้างไว้เกิน 1 วินาที ไพ่จะโผล่ขึ้นมาตรงนิ้วทันที!
-  if(holdTimer) clearTimeout(holdTimer);
-  holdTimer = setTimeout(() => {
-    if(isTouching) showMagicianCard = true;
-  }, 1000);
-}
-
-function handleMove(x, y) {
-  touchX = x; touchY = y;
-}
-
-function handleEnd() {
-  isTouching = false;
-  showMagicianCard = false;
-  if(holdTimer) clearTimeout(holdTimer);
-}
-
-// เชื่อมระบบสัมผัสหน้าจอโทรศัพท์
-window.addEventListener('touchstart', (e) => {
-  const t = e.touches[0];
-  handleStart(t.clientX, t.clientY);
+  if (showMagicianCard) {
+    drawGothicMagician();
+  }
 });
-window.addEventListener('touchmove', (e) => {
-  const t = e.touches[0];
-  handleMove(t.clientX, t.clientY);
-});
-window.addEventListener('touchend', handleEnd);
 
-// เชื่อมระบบเมาส์ (สำหรับคอมพิวเตอร์)
-window.addEventListener('mousedown', (e) => handleStart(e.clientX, e.clientY));
-window.addEventListener('mousemove', (e) => { if(isTouching) handleMove(e.clientX, e.clientY); });
-window.addEventListener('mouseup', handleEnd);
-
-// เปิดกล้องเบื้องหลังปกติ
-navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 }, audio: false })
-.then(stream => { video.srcObject = stream; })
-.catch(err => console.error("Camera error:", err));
+async function startCamera() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 }, audio: false });
+    video.srcObject = stream;
+    
+    async function processFrame() {
+      if (!video.paused && !video.ended) {
+        await hands.send({ image: video });
+      }
+      requestAnimationFrame(processFrame);
+    }
+    video.addEventListener('play', () => {
+      requestAnimationFrame(processFrame);
+    });
+  } catch (err) {
+    console.error("Camera access error:", err);
+  }
+}
+startCamera();
 </script>
 </body>
 </html>
